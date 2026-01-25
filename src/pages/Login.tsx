@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-
+export default function Login() {
   const { user, signInWithUsername, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
   const [googleLoading, setGoogleLoading] = useState(false);
 
   // Redireciona para a área do cliente se já estiver autenticado
-  React.useEffect(() => {
+  useEffect(() => {
     if (user) {
       navigate('/client', { replace: true });
     }
