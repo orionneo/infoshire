@@ -124,11 +124,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      // Determinar a URL de redirect baseado no ambiente
-      const isProduction = window.location.hostname === 'infoshire.com.br' || window.location.hostname.includes('infoshire');
-      const redirectTo = isProduction 
-        ? 'https://infoshire.com.br/client'
-        : `${window.location.origin}/client`;
+      // Usar canonical origin para evitar mistura de www/non-www
+      const canonicalOrigin = window.location.origin;
+      const redirectTo = `${canonicalOrigin}/auth/callback?next=/client`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
