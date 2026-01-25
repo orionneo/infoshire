@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Loader2, Package } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ClientLayout } from '@/components/layouts/ClientLayout';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,20 @@ import type { ServiceOrder } from '@/types/types';
 export default function ClientDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Trata o callback do OAuth e limpa a URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('code') || params.get('access_token')) {
+      const timer = setTimeout(() => {
+        navigate('/client', { replace: true });
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     if (user) {
