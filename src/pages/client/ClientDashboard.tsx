@@ -61,9 +61,14 @@ export default function ClientDashboard() {
   return (
     <ClientLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Minhas Ordens de Serviço</h1>
-          <p className="text-muted-foreground">Acompanhe o status dos seus reparos</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Minhas Ordens de Serviço</h1>
+            <p className="text-muted-foreground">Acompanhe o status dos seus reparos</p>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/')}>
+            Voltar ao site principal
+          </Button>
         </div>
 
         {orders.length === 0 ? (

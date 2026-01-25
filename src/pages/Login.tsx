@@ -15,10 +15,16 @@ export default function Login() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const adminEmail = 'admin@infoshire.com.br';
+  const isAdminEmail = (email?: string) => email?.trim().toLowerCase() === adminEmail;
 
   // Redireciona para a área do cliente se já estiver autenticado
   useEffect(() => {
     if (user) {
+      if (isAdminEmail(user.email)) {
+        navigate('/admin', { replace: true });
+        return;
+      }
       navigate('/client', { replace: true });
     }
   }, [user, navigate]);
@@ -67,6 +73,11 @@ export default function Login() {
       }
 
       // Redirecionar para a página anterior ou para o dashboard
+      const normalizedEmail = isEmail ? data.username.trim().toLowerCase() : undefined;
+      if (isAdminEmail(normalizedEmail)) {
+        navigate('/admin', { replace: true });
+        return;
+      }
       const from = (location.state as any)?.from || '/client';
       navigate(from, { replace: true });
     } catch (error) {
@@ -198,8 +209,9 @@ export default function Login() {
             type="button"
             variant="outline"
             className="w-full"
+            title="Login com Google desativado no momento"
             onClick={handleGoogleLogin}
-            disabled={googleLoading || loading}
+            disabled
           >
             {googleLoading ? (
               <>
