@@ -46,12 +46,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    const isAdminPath = window.location.pathname.startsWith('/admin');
+
+    if (isAdminPath) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          getProfile(session.user.id).then(setProfile);
+        }
+        setLoading(false);
+      });
+      // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          getProfile(session.user.id).then(setProfile);
+        } else {
+          setProfile(null);
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    }
+
+    let pendingReadySignals = 2;
+    let initialEventHandled = false;
+    const markReady = () => {
+      pendingReadySignals -= 1;
+      if (pendingReadySignals <= 0) {
+        setLoading(false);
+      }
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         getProfile(session.user.id).then(setProfile);
+      } else {
+        setProfile(null);
       }
-      setLoading(false);
+      markReady();
     });
     // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -60,6 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getProfile(session.user.id).then(setProfile);
       } else {
         setProfile(null);
+      }
+      if (!initialEventHandled) {
+        initialEventHandled = true;
+        markReady();
       }
     });
 
