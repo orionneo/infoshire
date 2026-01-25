@@ -38,42 +38,15 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: Prepare Pages artifact (detect output dir)
-        run: |
-          set -e
-          rm -rf site
-          mkdir -p site
+      - name: SPA fallback for GitHub Pages
+        run: cp dist/index.html dist/404.html
 
-          if [ -d "dist" ]; then
-            echo "Using dist/"
-            cp -a dist/. site/
-          elif [ -d "dev-dist" ]; then
-            echo "Using dev-dist/"
-            cp -a dev-dist/. site/
-          elif [ -d "build" ]; then
-            echo "Using build/"
-            cp -a build/. site/
-          else
-            echo "No dist/, dev-dist/ or build/ found. Listing root:"
-            ls -la
-            exit 1
-          fi
-
-          # SPA fallback
-          if [ -f site/index.html ]; then
-            cp site/index.html site/404.html
-          else
-            echo "site/index.html not found after copy."
-            find site -maxdepth 3 -type f -name index.html -print || true
-            exit 1
-          fi
-
-          # Custom domain
-          echo "infoshire.com.br" > site/CNAME
+      - name: Add CNAME for custom domain
+        run: echo "infoshire.com.br" > dist/CNAME
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ./site
+          path: ./dist
 
   deploy:
     needs: build
