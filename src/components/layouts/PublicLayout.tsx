@@ -79,7 +79,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             {/* Logo Image */}
             <div className="h-12 w-12 flex items-center justify-center">
               <img
-                src="{logoInfoshire}"
+                src={logoInfoshire}
                 alt="InfoShire Logo"
                 className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(139,255,0,0.8)]"
               />
@@ -407,7 +407,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-between px-2">
               {/* Mario */}
               <img
-                src="{logoWhite}"
+                src={logoWhite}
                 alt="Mario"
                 className="h-16 w-auto object-contain"
               />
@@ -429,7 +429,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               
               {/* Astrobot */}
               <img
-                src="{logoDark}"
+                src={logoDark}
                 alt="Astrobot"
                 className="h-16 w-auto object-contain"
               />
@@ -653,7 +653,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               {/* Mario - Left Side */}
               <div className="relative group hidden sm:block">
                 <img
-                  src="{logoWhite}"
+                  src={logoWhite}
                   alt="Mario"
                   className="h-20 sm:h-24 md:h-32 w-auto object-contain transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_20px_rgba(0,255,0,0.6)]"
                 />
@@ -667,7 +667,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               {/* Astrobot - Right Side */}
               <div className="relative group hidden sm:block">
                 <img
-                  src="{logoDark}"
+                  src={logoDark}
                   alt="Astrobot"
                   className="h-20 sm:h-24 md:h-32 w-auto object-contain transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_20px_rgba(0,255,0,0.6)]"
                 />
