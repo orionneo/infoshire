@@ -13,9 +13,18 @@ import {
 export function AnalyticsTracker() {
   const location = useLocation();
   const initialized = useRef(false);
+  const path = location.pathname;
+  const analyticsDisabled =
+    path.startsWith('/admin') ||
+    path === '/login' ||
+    path === '/auth/callback';
 
   // Inicializar analytics uma única vez (sessão + click tracking)
   useEffect(() => {
+    if (analyticsDisabled) {
+      return;
+    }
+
     if (!initialized.current) {
       // Iniciar sessão e configurar click tracking
       trackSessionStart().catch((error) => {
@@ -31,16 +40,21 @@ export function AnalyticsTracker() {
 
   // Rastrear mudanças de página
   useEffect(() => {
-    const path = location.pathname;
+    if (analyticsDisabled) {
+      return;
+    }
+
     const title = document.title || path;
     
     // Pequeno delay para garantir que o título da página foi atualizado
     const timer = setTimeout(() => {
-      trackPageView(path, document.title || title);
+      trackPageView(path, document.title || title).catch((error) => {
+        console.error('[ANALYTICS] Falha ao registrar pageview:', error);
+      });
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [location.pathname]);
+  }, [analyticsDisabled, path]);
 
   // Componente não renderiza nada
   return null;
