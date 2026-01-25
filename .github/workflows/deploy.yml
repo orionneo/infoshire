@@ -32,44 +32,48 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Debug build output
-        run: |
-          echo "pwd:"
-          pwd
-          echo "list root:"
-          ls -la
-          echo "list dist (if exists):"
-          ls -la dist || true
-          echo "list build (if exists):"
-          ls -la build || true
-          echo "find index.html:"
-          find . -maxdepth 6 -name index.html -print
+      - name: Build
+        run: pnpm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: SPA fallback for GitHub Pages (debug-safe)
+      - name: Prepare Pages artifact (detect output dir)
         run: |
-          if [ -f dist/index.html ]; then
-            cp dist/index.html dist/404.html
-          elif [ -f build/index.html ]; then
-            cp build/index.html build/404.html
+          set -e
+          rm -rf site
+          mkdir -p site
+
+          if [ -d "dist" ]; then
+            echo "Using dist/"
+            cp -a dist/. site/
+          elif [ -d "dev-dist" ]; then
+            echo "Using dev-dist/"
+            cp -a dev-dist/. site/
+          elif [ -d "build" ]; then
+            echo "Using build/"
+            cp -a build/. site/
           else
-            echo "No dist/index.html or build/index.html found. Build output is elsewhere."
+            echo "No dist/, dev-dist/ or build/ found. Listing root:"
+            ls -la
             exit 1
           fi
 
-      - name: Add CNAME for custom domain
-        run: |
-          if [ -d dist ]; then
-            echo "infoshire.com.br" > dist/CNAME
-          elif [ -d build ]; then
-            echo "infoshire.com.br" > build/CNAME
+          # SPA fallback
+          if [ -f site/index.html ]; then
+            cp site/index.html site/404.html
           else
-            echo "No dist/ or build/ directory to write CNAME."
+            echo "site/index.html not found after copy."
+            find site -maxdepth 3 -type f -name index.html -print || true
             exit 1
           fi
+
+          # Custom domain
+          echo "infoshire.com.br" > site/CNAME
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: ./site
 
   deploy:
     needs: build
