@@ -1,0 +1,324 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Search, ExternalLink, Copy, CheckCircle2, AlertCircle, Loader2, Lightbulb, ChevronDown, ChevronUp } from 'lucide-react';
+import { supabase } from '@/db/supabase';
+import { toast } from 'sonner';
+
+interface WebSearchAssistantProps {
+  context?: 'abertura_os' | 'diagnostico' | 'validacao';
+  onApplyResult?: (result: string) => void;
+  placeholder?: string;
+  title?: string;
+  description?: string;
+}
+
+interface SearchResult {
+  answer: string;
+  sources: Array<{
+    title: string;
+    url: string;
+  }>;
+  searchQueries: string[];
+}
+
+export default function WebSearchAssistant({
+  context,
+  onApplyResult,
+  placeholder = 'Ex: iPhone 13 Pro Max especificações bateria',
+  title = '🌐 Busca Web com IA',
+  description = 'Busque informações técnicas na web com citações de fontes confiáveis',
+}: WebSearchAssistantProps) {
+  const [query, setQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [result, setResult] = useState<SearchResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [showFullAnswer, setShowFullAnswer] = useState(false);
+
+  // Extract key insights from the answer
+  const extractInsights = (answer: string): string[] => {
+    const insights: string[] = [];
+    
+    // Split by lines and filter meaningful content
+    const lines = answer.split('\n').filter(line => line.trim().length > 0);
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Skip very short lines or headers
+      if (trimmed.length < 15) continue;
+      
+      // Look for bullet points, numbered lists, or important info
+      if (
+        trimmed.match(/^[-•*]\s/) || // Bullet points
+        trimmed.match(/^\d+[\.)]\s/) || // Numbered lists
+        trimmed.includes(':') || // Key-value pairs
+        trimmed.match(/\b(especificação|problema|causa|solução|comum|frequente)\b/i) // Keywords
+      ) {
+        // Clean up the line
+        let insight = trimmed
+          .replace(/^[-•*]\s/, '• ')
+          .replace(/^\d+[\.)]\s/, '• ');
+        
+        // Limit length
+        if (insight.length > 150) {
+          insight = insight.substring(0, 147) + '...';
+        }
+        
+        insights.push(insight);
+        
+        // Limit to 5 key insights
+        if (insights.length >= 5) break;
+      }
+    }
+    
+    // If no insights found, take first few sentences
+    if (insights.length === 0) {
+      const sentences = answer.match(/[^.!?]+[.!?]+/g) || [];
+      insights.push(...sentences.slice(0, 3).map(s => '• ' + s.trim()));
+    }
+    
+    return insights;
+  };
+
+  const handleSearch = async () => {
+    if (!query.trim()) {
+      toast.error('Digite uma consulta para buscar');
+      return;
+    }
+
+    setIsSearching(true);
+    setError(null);
+    setResult(null);
+    setShowFullAnswer(false);
+
+    try {
+      console.log('🔍 Iniciando busca web:', { query, context });
+
+      const { data, error: functionError } = await supabase.functions.invoke('ai-web-search', {
+        body: {
+          query: query.trim(),
+          context,
+        },
+      });
+
+      if (functionError) {
+        throw functionError;
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Erro ao buscar informações');
+      }
+
+      console.log('✅ Busca concluída:', {
+        answerLength: data.answer?.length,
+        sourcesCount: data.sources?.length,
+      });
+
+      setResult({
+        answer: data.answer,
+        sources: data.sources || [],
+        searchQueries: data.searchQueries || [],
+      });
+
+      toast.success('Informações encontradas!');
+    } catch (err: any) {
+      console.error('❌ Erro na busca:', err);
+      const errorMessage = err.message || 'Erro ao buscar informações. Tente novamente.';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleCopyInsights = () => {
+    if (result?.answer) {
+      const insights = extractInsights(result.answer);
+      const insightsText = insights.join('\n');
+      navigator.clipboard.writeText(insightsText);
+      setCopied(true);
+      toast.success('Insights copiados!');
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleApplyInsights = () => {
+    if (result?.answer && onApplyResult) {
+      const insights = extractInsights(result.answer);
+      const insightsText = insights.join('\n');
+      onApplyResult(insightsText);
+      toast.success('Insights aplicados ao campo!');
+    }
+  };
+
+  return (
+    <Card className="border-primary/20">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Search className="h-5 w-5 text-primary" />
+          {title}
+        </CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Input de busca */}
+        <div className="space-y-2">
+          <Label htmlFor="search-query">O que você quer saber?</Label>
+          <div className="flex gap-2">
+            <Input
+              id="search-query"
+              placeholder={placeholder}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isSearching) {
+                  handleSearch();
+                }
+              }}
+              disabled={isSearching}
+              className="flex-1"
+            />
+            <Button
+              onClick={handleSearch}
+              disabled={isSearching || !query.trim()}
+              className="min-w-[100px]"
+            >
+              {isSearching ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Buscando...
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4 mr-2" />
+                  Buscar
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Aviso sobre tempo de resposta */}
+        {isSearching && (
+          <Alert>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <AlertDescription>
+              Buscando informações na web... A primeira resposta pode levar até 30 segundos. Por favor, aguarde.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Loading skeleton */}
+        {isSearching && (
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-full bg-muted" />
+            <Skeleton className="h-4 w-full bg-muted" />
+            <Skeleton className="h-4 w-3/4 bg-muted" />
+          </div>
+        )}
+
+        {/* Erro */}
+        {error && !isSearching && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Resultado */}
+        {result && !isSearching && (
+          <div className="space-y-4">
+            {/* Queries de busca usadas */}
+            {result.searchQueries.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Buscas realizadas:</Label>
+                <div className="flex flex-wrap gap-2">
+                  {result.searchQueries.map((q, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-xs">
+                      {q}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Resposta */}
+            <div className="space-y-2">
+              <Label>Informações encontradas:</Label>
+              <div className="bg-muted/50 p-4 rounded-lg border border-border">
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{result.answer}</p>
+              </div>
+            </div>
+
+            {/* Fontes */}
+            {result.sources.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  Fontes citadas ({result.sources.length}):
+                </Label>
+                <div className="space-y-2">
+                  {result.sources.map((source, idx) => (
+                    <a
+                      key={idx}
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group"
+                    >
+                      <ExternalLink className="h-4 w-4 mt-0.5 text-muted-foreground group-hover:text-primary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate group-hover:text-primary">
+                          {source.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{source.url}</p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Aviso de validação */}
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                ⚠️ Sempre valide as informações antes de usar. O técnico deve ter controle final sobre as decisões.
+              </AlertDescription>
+            </Alert>
+
+            {/* Ações */}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleCopy} className="flex-1">
+                {copied ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar Texto
+                  </>
+                )}
+              </Button>
+              {onApplyResult && (
+                <Button onClick={handleApply} className="flex-1">
+                  Aplicar Informações
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

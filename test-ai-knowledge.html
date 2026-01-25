@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste AI Knowledge Query</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    h1 {
+      color: #60a5fa;
+    }
+    .test-section {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      border: 1px solid #334155;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    button:disabled {
+      background: #475569;
+      cursor: not-allowed;
+    }
+    .result {
+      background: #0f172a;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 15px;
+      border: 1px solid #334155;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .success {
+      color: #22c55e;
+    }
+    .error {
+      color: #ef4444;
+    }
+    .info {
+      color: #60a5fa;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: 14px;
+      margin: 10px 0;
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Teste AI Knowledge Query</h1>
+  
+  <div class="test-section">
+    <h2>Teste Personalizado</h2>
+    
+    <label>Descrição do Problema:</label>
+    <textarea id="customText" rows="3" placeholder="Ex: bateria não carrega">bateria não carrega</textarea>
+    
+    <label>Equipamento:</label>
+    <input type="text" id="customEquipment" placeholder="Ex: Celular" value="PlayStation 4 (PS4)">
+    
+    <label>Marca:</label>
+    <input type="text" id="customBrand" placeholder="Ex: Samsung" value="Sony">
+    
+    <label>Modelo:</label>
+    <input type="text" id="customModel" placeholder="Ex: Galaxy S21" value="CUH-2015A">
+    
+    <button onclick="runCustomTest()">🚀 Testar</button>
+    
+    <div id="customResult" class="result" style="display: none;"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Testes Rápidos</h2>
+    <button onclick="runTest('bateria não carrega', 'Celular', 'Samsung', 'Galaxy S21')">
+      🔋 Teste: Bateria
+    </button>
+    <button onclick="runTest('tela não liga', 'Notebook', 'Dell', 'Inspiron 15')">
+      🖥️ Teste: Tela
+    </button>
+    <button onclick="runTest('celular molhou e não liga mais', 'iPhone', 'Apple', 'iPhone 12')">
+      💧 Teste: Água
+    </button>
+    <button onclick="runTest('não liga após queda', 'Tablet', 'Samsung', 'Galaxy Tab')">
+      📱 Teste: Queda
+    </button>
+    
+    <div id="quickResult" class="result" style="display: none;"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>📊 Status do Sistema</h2>
+    <button onclick="checkStatus()">Verificar Status</button>
+    <div id="statusResult" class="result" style="display: none;"></div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+
+    // Configurar Supabase (pegar do .env)
+    const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || prompt('Digite a SUPABASE_URL:');
+    const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || prompt('Digite a SUPABASE_ANON_KEY:');
+
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      document.body.innerHTML = '<h1 style="color: red;">❌ Configuração inválida</h1><p>Configure SUPABASE_URL e SUPABASE_ANON_KEY</p>';
+    }
+
+    window.supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    window.runTest = async function(text, equipment, brand, model) {
+      const resultDiv = document.getElementById('quickResult');
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = '<p class="info">⏳ Testando...</p>';
+
+      try {
+        const startTime = Date.now();
+        
+        const { data, error } = await window.supabase.functions.invoke('ai-knowledge-query', {
+          body: {
+            text,
+            equipamento_tipo: equipment,
+            marca: brand,
+            modelo: model,
+            context: {
+              mode: 'OPEN_OS',
+            },
+          },
+        });
+
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
+        if (error) {
+          resultDiv.innerHTML = `
+            <p class="error">❌ Erro na função</p>
+            <pre>${JSON.stringify(error, null, 2)}</pre>
+          `;
+          
+          if (error.context) {
+            try {
+              const errorText = await error.context.text();
+              resultDiv.innerHTML += `
+                <p class="error">Detalhes do erro:</p>
+                <pre>${errorText}</pre>
+              `;
+            } catch (e) {
+              console.error('Não foi possível ler o contexto do erro');
+            }
+          }
+          return;
+        }
+
+        let html = `<p class="success">✅ Sucesso! (${duration}ms)</p>`;
+        
+        html += `<h3>📋 Informações Básicas</h3>`;
+        html += `<p><strong>Modo:</strong> ${data.mode}</p>`;
+        html += `<p><strong>Fallback:</strong> ${data.meta?.fallback_reason || 'Nenhum'}</p>`;
+        html += `<p><strong>Tempo:</strong> ${data.meta?.processing_time_ms}ms</p>`;
+
+        if (data.suggestions) {
+          html += `<h3>💡 Sugestões</h3>`;
+          html += `<p><strong>Categoria:</strong> ${data.suggestions.suggested_category}</p>`;
+          html += `<p><strong>Descrição:</strong> ${data.suggestions.organized_description}</p>`;
+          
+          if (data.suggestions.initial_checklist?.length > 0) {
+            html += `<p><strong>Checklist (${data.suggestions.initial_checklist.length} itens):</strong></p><ul>`;
+            data.suggestions.initial_checklist.forEach(item => {
+              html += `<li>${item}</li>`;
+            });
+            html += `</ul>`;
+          }
+          
+          if (data.suggestions.clarification_questions?.length > 0) {
+            html += `<p><strong>Perguntas (${data.suggestions.clarification_questions.length}):</strong></p><ul>`;
+            data.suggestions.clarification_questions.slice(0, 3).forEach(q => {
+              html += `<li>${q}</li>`;
+            });
+            html += `</ul>`;
+          }
+        } else {
+          html += `<p class="error">❌ Nenhuma sugestão retornada</p>`;
+        }
+
+        if (data.knowledge?.term_definitions?.length > 0) {
+          html += `<h3>📚 Termos Encontrados (${data.knowledge.term_definitions.length})</h3>`;
+          data.knowledge.term_definitions.forEach(term => {
+            html += `<p><strong>${term.term}</strong> (${term.category || 'N/A'})</p>`;
+            if (term.definition_internal) {
+              html += `<p style="font-size: 12px; color: #94a3b8;">${term.definition_internal.substring(0, 100)}...</p>`;
+            }
+          });
+        }
+
+        html += `<h3>🔍 Resposta Completa</h3>`;
+        html += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+
+        resultDiv.innerHTML = html;
+
+      } catch (err) {
+        resultDiv.innerHTML = `
+          <p class="error">❌ Erro inesperado</p>
+          <pre>${err.message}\n\n${err.stack}</pre>
+        `;
+      }
+    };
+
+    window.runCustomTest = function() {
+      const text = document.getElementById('customText').value;
+      const equipment = document.getElementById('customEquipment').value;
+      const brand = document.getElementById('customBrand').value;
+      const model = document.getElementById('customModel').value;
+
+      const resultDiv = document.getElementById('customResult');
+      resultDiv.style.display = 'block';
+      
+      window.runTest(text, equipment, brand, model).then(() => {
+        // Move result to custom div
+        const quickResult = document.getElementById('quickResult');
+        resultDiv.innerHTML = quickResult.innerHTML;
+        quickResult.style.display = 'none';
+      });
+    };
+
+    window.checkStatus = async function() {
+      const resultDiv = document.getElementById('statusResult');
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = '<p class="info">⏳ Verificando...</p>';
+
+      try {
+        // Check ai_config
+        const { data: configData, error: configError } = await window.supabase
+          .from('ai_config')
+          .select('config_key, config_value, is_active')
+          .limit(5);
+
+        // Check ai_terms
+        const { data: termsData, error: termsError } = await window.supabase
+          .from('ai_terms')
+          .select('term, term_category, frequency')
+          .order('frequency', { ascending: false })
+          .limit(10);
+
+        let html = '<h3>✅ Status do Sistema</h3>';
+        
+        if (configError) {
+          html += `<p class="error">❌ Erro ao buscar configurações: ${configError.message}</p>`;
+        } else {
+          html += `<p class="success">✅ Configurações: ${configData?.length || 0} encontradas</p>`;
+        }
+
+        if (termsError) {
+          html += `<p class="error">❌ Erro ao buscar termos: ${termsError.message}</p>`;
+        } else {
+          html += `<p class="success">✅ Termos técnicos: ${termsData?.length || 0} na base</p>`;
+          
+          if (termsData && termsData.length > 0) {
+            html += '<h4>Top 10 Termos:</h4><ul>';
+            termsData.forEach(term => {
+              html += `<li><strong>${term.term}</strong> (${term.term_category}) - Frequência: ${term.frequency}</li>`;
+            });
+            html += '</ul>';
+          }
+        }
+
+        resultDiv.innerHTML = html;
+
+      } catch (err) {
+        resultDiv.innerHTML = `
+          <p class="error">❌ Erro ao verificar status</p>
+          <pre>${err.message}</pre>
+        `;
+      }
+    };
+
+    console.log('✅ Teste AI Knowledge Query carregado');
+    console.log('Supabase URL:', SUPABASE_URL);
+  </script>
+</body>
+</html>
