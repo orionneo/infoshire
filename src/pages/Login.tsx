@@ -9,13 +9,19 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-export default function Login() {
-  const { signInWithUsername, signInWithGoogle } = useAuth();
+  const { user, signInWithUsername, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Redireciona para a área do cliente se já estiver autenticado
+  React.useEffect(() => {
+    if (user) {
+      navigate('/client', { replace: true });
+    }
+  }, [user, navigate]);
 
   const form = useForm({
     defaultValues: {
