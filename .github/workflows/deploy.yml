@@ -32,17 +32,40 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: Debug build output
+        run: |
+          echo "pwd:"
+          pwd
+          echo "list root:"
+          ls -la
+          echo "list dist (if exists):"
+          ls -la dist || true
+          echo "list build (if exists):"
+          ls -la build || true
+          echo "find index.html:"
+          find . -maxdepth 6 -name index.html -print
 
-      - name: SPA fallback for GitHub Pages
-        run: cp dist/index.html dist/404.html
+      - name: SPA fallback for GitHub Pages (debug-safe)
+        run: |
+          if [ -f dist/index.html ]; then
+            cp dist/index.html dist/404.html
+          elif [ -f build/index.html ]; then
+            cp build/index.html build/404.html
+          else
+            echo "No dist/index.html or build/index.html found. Build output is elsewhere."
+            exit 1
+          fi
 
       - name: Add CNAME for custom domain
-        run: echo "infoshire.com.br" > dist/CNAME
+        run: |
+          if [ -d dist ]; then
+            echo "infoshire.com.br" > dist/CNAME
+          elif [ -d build ]; then
+            echo "infoshire.com.br" > build/CNAME
+          else
+            echo "No dist/ or build/ directory to write CNAME."
+            exit 1
+          fi
 
       - uses: actions/upload-pages-artifact@v3
         with:
