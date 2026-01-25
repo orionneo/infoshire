@@ -198,8 +198,9 @@ export default function Login() {
             type="button"
             variant="outline"
             className="w-full"
+            title="Login com Google desativado no momento"
             onClick={handleGoogleLogin}
-            disabled={googleLoading || loading}
+            disabled
           >
             {googleLoading ? (
               <>
