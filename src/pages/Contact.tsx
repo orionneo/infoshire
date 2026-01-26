@@ -41,7 +41,10 @@ export default function Contact() {
   return (
     <PublicLayout>
       {/* Hero Section - Clean layout like Home */}
-      <section className="relative bg-transparent py-20 xl:py-32 overflow-hidden">
+      <section
+        className="relative bg-transparent pt-28 pb-20 xl:pt-32 xl:pb-32 overflow-hidden"
+        style={{ backgroundImage: 'none' }}
+      >
         <div className="container relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             {/* Logo InfoShire */}
