@@ -309,7 +309,7 @@ export default function Services() {
       </section>
 
       {/* Serviços por Categoria */}
-      <section className="py-20 bg-background">
+      <section className="py-20 bg-gradient-to-b from-transparent to-card/50 relative">
         <div className="container">
           <div className="space-y-20">
             {serviceCategories.map((category) => {
@@ -399,7 +399,7 @@ export default function Services() {
       </section>
 
       {/* Diferenciais da Infoshire */}
-      <section className="py-20 bg-gradient-to-b from-background to-card">
+      <section className="py-20 bg-transparent relative">
         <div className="container">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
@@ -436,7 +436,7 @@ export default function Services() {
       </section>
 
       {/* Como Funciona o Atendimento */}
-      <section className="py-20 bg-card">
+      <section className="py-20 bg-gradient-to-b from-transparent to-card/50 relative">
         <div className="container">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12">
@@ -484,7 +484,7 @@ export default function Services() {
       </section>
 
       {/* CTA Final */}
-      <section className="py-20 bg-gradient-to-b from-card to-background">
+      <section className="py-20 bg-gradient-to-b from-card/50 to-transparent relative">
         <div className="container">
           <div className="max-w-4xl mx-auto">
             <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30 overflow-hidden">
