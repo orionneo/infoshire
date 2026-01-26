@@ -1,4 +1,4 @@
-import { Apple, ArrowRight, CheckCircle2, Clock, Database, Gamepad2, HardDrive, Laptop, MessageCircle, Monitor, Shield, Smartphone, Sparkles, Star, Tv, Wrench, Zap } from 'lucide-react';
+import { Apple, ArrowRight, CheckCircle2, Clock, Database, Gamepad2, HardDrive, Laptop, MessageCircle, Monitor, Shield, Sparkles, Star, Tv, Wrench, Zap } from 'lucide-react';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -88,7 +88,7 @@ export default function Services() {
     {
       id: 'apple',
       category: 'Produtos Apple',
-      description: 'Especialistas em MacBook, iPhone, iPad e iMac. Reparo com qualidade e peças certificadas.',
+      description: 'Especialistas em MacBook, iPad e iMac. Reparo com qualidade e peças certificadas.',
       icon: Apple,
       services: [
         {
@@ -97,13 +97,6 @@ export default function Services() {
           problem: 'MacBook não liga, bateria inchada, teclado com defeito, tela com manchas ou lento?',
           description: 'Reparo especializado em MacBook: troca de bateria, teclado, tela Retina, upgrade de SSD e memória, reparo de placa lógica.',
           examples: ['Bateria inchada', 'Teclado não funciona', 'Tela com manchas', 'Não liga', 'Lentidão'],
-        },
-        {
-          icon: Smartphone,
-          title: 'iPhone (Todos os Modelos)',
-          problem: 'iPhone com tela quebrada, bateria viciada, não carrega, câmera com defeito ou travado?',
-          description: 'Conserto de iPhone: troca de tela original, bateria, câmera, alto-falante, reparo de placa e desbloqueio iCloud (quando possível).',
-          examples: ['Tela quebrada', 'Bateria descarrega rápido', 'Não carrega', 'Câmera embaçada', 'Travado no logo'],
         },
         {
           icon: Monitor,
@@ -272,18 +265,10 @@ export default function Services() {
   return (
     <PublicLayout>
       {/* Hero Section */}
-      <section className="relative bg-black py-20 xl:py-32 overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'radial-gradient(circle at 2px 2px, hsl(var(--primary)) 1px, transparent 0)',
-            backgroundSize: '40px 40px'
-          }}></div>
-        </div>
-        
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-background"></div>
-        
+      <section
+        className="relative bg-transparent pt-28 pb-20 xl:pt-32 xl:pb-32 overflow-hidden"
+        style={{ backgroundImage: 'none' }}
+      >
         <div className="container relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl xl:text-6xl font-bold mb-6">
