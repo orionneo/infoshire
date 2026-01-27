@@ -24,8 +24,15 @@ export default function ForgotPassword() {
   const onSubmit = async (data: { email: string }) => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      const normalizedEmail = data.email.trim().toLowerCase();
+      const redirectOverride = import.meta.env.VITE_PASSWORD_RECOVERY_REDIRECT_TO;
+      const redirectTo = redirectOverride || `${window.location.origin}/reset-password`;
+
+      const { error } = await supabase.functions.invoke('send-password-recovery', {
+        body: {
+          email: normalizedEmail,
+          redirectTo,
+        },
       });
 
       if (error) throw error;
