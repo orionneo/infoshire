@@ -25,15 +25,14 @@ export default function ForgotPassword() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: `${window.location.origin}/change-password`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) throw error;
 
       setEmailSent(true);
       toast({
-        title: 'E-mail enviado',
-        description: 'Verifique sua caixa de entrada para redefinir sua senha',
+        title: 'Se o e-mail existir, enviaremos um link de recuperação.',
       });
     } catch (error: any) {
       console.error('Erro ao enviar e-mail:', error);
@@ -58,16 +57,13 @@ export default function ForgotPassword() {
               </div>
             </div>
             <div className="text-center">
-              <CardTitle className="text-2xl">E-mail Enviado!</CardTitle>
-              <CardDescription>
-                Verifique sua caixa de entrada
-              </CardDescription>
+              <CardTitle className="text-2xl">Verifique seu e-mail</CardTitle>
+              <CardDescription>Se o e-mail existir, enviaremos um link de recuperação.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground text-center">
-              Enviamos um link de recuperação de senha para o seu e-mail. 
-              Clique no link para redefinir sua senha.
+              Se o e-mail informado existir, você receberá um link para redefinir sua senha.
             </p>
             <p className="text-xs text-muted-foreground text-center">
               Não recebeu o e-mail? Verifique sua pasta de spam ou tente novamente.
@@ -114,22 +110,10 @@ export default function ForgotPassword() {
           </div>
           <div className="text-center">
             <CardTitle className="text-2xl">Recuperar Senha</CardTitle>
-            <CardDescription>
-              Entre em contato com o suporte para receber um link de recuperação
-            </CardDescription>
+            <CardDescription>Receba um link de recuperação no seu e-mail</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-muted p-4 rounded-lg space-y-2">
-            <p className="text-sm font-medium">Como recuperar sua senha:</p>
-            <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-              <li>Entre em contato com o suporte da assistência técnica</li>
-              <li>Informe seu e-mail cadastrado: <strong className="text-foreground">{form.watch('email') || 'seu@email.com'}</strong></li>
-              <li>Você receberá um link de recuperação via WhatsApp</li>
-              <li>Clique no link e defina sua nova senha</li>
-            </ol>
-          </div>
-
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -157,9 +141,16 @@ export default function ForgotPassword() {
                 )}
               />
 
-              <p className="text-xs text-muted-foreground text-center">
-                Copie seu e-mail acima e entre em contato com o suporte para solicitar a recuperação de senha.
-              </p>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  'Enviar link de recuperação'
+                )}
+              </Button>
             </form>
           </Form>
           
