@@ -47,17 +47,31 @@ export default function Register() {
 
     setLoading(true);
     try {
+      const normalizedName = data.name.trim();
+      const normalizedEmail = data.email.trim().toLowerCase();
+      const phoneInput = data.phone.trim();
       const { error: signUpError } = await signUpWithEmail({
-        name: data.name,
-        phone: data.phone,
-        email: data.email || undefined,
+        name: normalizedName,
+        phone: phoneInput,
+        email: normalizedEmail,
         password: data.password,
       });
       
       if (signUpError) {
+        const errorMessage = signUpError.message.toLowerCase();
+        let description = signUpError.message || 'Não foi possível criar a conta';
+
+        if (errorMessage.includes('ddd + número')) {
+          description = 'Informe DDD + número (ex: 19 99798-8952).';
+        } else if (errorMessage.includes('already') || errorMessage.includes('exist')) {
+          description = 'Este e-mail já está cadastrado. Faça login ou recupere sua senha.';
+        } else if (errorMessage.includes('email') && errorMessage.includes('invalid')) {
+          description = 'E-mail inválido. Verifique e tente novamente.';
+        }
+
         toast({
           title: 'Erro ao cadastrar',
-          description: signUpError.message || 'Não foi possível criar a conta',
+          description,
           variant: 'destructive',
         });
         return;
@@ -178,6 +192,7 @@ export default function Register() {
                 control={form.control}
                 name="email"
                 rules={{
+                  required: 'E-mail é obrigatório',
                   pattern: {
                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
                     message: 'E-mail inválido',
@@ -185,13 +200,10 @@ export default function Register() {
                 }}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>E-mail (opcional)</FormLabel>
+                    <FormLabel>E-mail *</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="seu@email.com" {...field} />
                     </FormControl>
-                    <FormDescription>
-                      Se informado, você poderá fazer login com e-mail
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
