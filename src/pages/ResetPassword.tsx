@@ -1,7 +1,7 @@
 import { Loader2, Lock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -10,13 +10,12 @@ import { supabase } from '@/db/supabase';
 import { useToast } from '@/hooks/use-toast';
 
 export default function ResetPassword() {
-  const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [validToken, setValidToken] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [validRecovery, setValidRecovery] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('Link inválido ou expirado');
 
   const form = useForm({
     defaultValues: {
@@ -26,43 +25,46 @@ export default function ResetPassword() {
   });
 
   useEffect(() => {
-    if (token) {
-      validateToken();
-    }
-  }, [token]);
+    void validateRecoverySession();
+  }, []);
 
-  const validateToken = async () => {
+  const validateRecoverySession = async () => {
     try {
-      const { data, error } = await supabase
-        .from('password_reset_tokens')
-        .select('*')
-        .eq('token', token)
-        .eq('used', false)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
+      const url = new URL(window.location.href);
+      const hashParams = new URLSearchParams(url.hash.replace('#', ''));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      const code = url.searchParams.get('code');
 
-      if (error) throw error;
-
-      if (!data) {
-        toast({
-          title: 'Link inválido',
-          description: 'Este link de recuperação é inválido ou já foi usado',
-          variant: 'destructive',
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
         });
-        setTimeout(() => navigate('/login'), 3000);
+
+        if (error) throw error;
+      } else if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+        if (error) throw error;
+      }
+
+      window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      if (!sessionData.session) {
+        setErrorMessage('Link inválido ou expirado');
         return;
       }
 
-      setValidToken(true);
-      setUserId(data.user_id);
+      setValidRecovery(true);
     } catch (error) {
-      console.error('Erro ao validar token:', error);
+      console.error('Erro ao validar recuperação:', error);
       toast({
         title: 'Erro',
         description: 'Não foi possível validar o link de recuperação',
         variant: 'destructive',
       });
-      setTimeout(() => navigate('/login'), 3000);
     } finally {
       setLoading(false);
     }
@@ -96,43 +98,13 @@ export default function ResetPassword() {
       return;
     }
 
-    if (!userId || !token) return;
-
     setSaving(true);
     try {
-      // Update password using Edge Function
-      const { data: resetData, error: resetError } = await supabase.functions.invoke('reset-user-password', {
-        body: JSON.stringify({
-          userId: userId,
-          newPassword: data.newPassword,
-        }),
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: data.newPassword,
       });
 
-      if (resetError) {
-        const errorMsg = await resetError?.context?.text();
-        console.error('Erro ao resetar senha:', errorMsg || resetError?.message);
-        throw new Error(errorMsg || resetError?.message);
-      }
-
-      if (resetData?.error) {
-        throw new Error(resetData.error);
-      }
-
-      // Mark token as used
-      const { error: tokenError } = await supabase
-        .from('password_reset_tokens')
-        .update({ used: true })
-        .eq('token', token);
-
-      if (tokenError) throw tokenError;
-
-      // Update profile to mark password as changed
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ password_changed: true })
-        .eq('id', userId);
-
-      if (profileError) throw profileError;
+      if (updateError) throw updateError;
 
       toast({
         title: 'Senha alterada!',
@@ -165,16 +137,17 @@ export default function ResetPassword() {
     );
   }
 
-  if (!validToken) {
+  if (!validRecovery) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/50 p-4">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Lock className="h-12 w-12 text-destructive mb-4" />
             <p className="text-lg font-medium mb-2">Link Inválido</p>
-            <p className="text-muted-foreground text-center">
-              Este link de recuperação é inválido ou já foi usado.
-            </p>
+            <p className="text-muted-foreground text-center">{errorMessage}</p>
+            <Button className="mt-6" onClick={() => navigate('/forgot-password')}>
+              Solicitar novo link
+            </Button>
           </CardContent>
         </Card>
       </div>

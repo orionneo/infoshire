@@ -101,7 +101,7 @@ const routes: RouteConfig[] = [
   },
   {
     name: 'Reset Password',
-    path: '/reset-password/:token',
+    path: '/reset-password',
     element: <ResetPassword />,
   },
   {
