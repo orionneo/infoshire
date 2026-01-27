@@ -57,10 +57,8 @@ export default function ForgotPassword() {
               </div>
             </div>
             <div className="text-center">
-              <CardTitle className="text-2xl">E-mail Enviado!</CardTitle>
-              <CardDescription>
-                Verifique sua caixa de entrada
-              </CardDescription>
+              <CardTitle className="text-2xl">Verifique seu e-mail</CardTitle>
+              <CardDescription>Se o e-mail existir, enviaremos um link de recuperação.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
