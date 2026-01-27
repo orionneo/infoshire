@@ -32,7 +32,7 @@ export default function ForgotPassword() {
 
       setEmailSent(true);
       toast({
-        title: 'Enviamos um link para seu e-mail',
+        title: 'Se o e-mail existir, enviaremos um link de recuperação.',
       });
     } catch (error: any) {
       console.error('Erro ao enviar e-mail:', error);
@@ -63,8 +63,7 @@ export default function ForgotPassword() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground text-center">
-              Enviamos um link de recuperação de senha para o seu e-mail.
-              Clique no link para redefinir sua senha.
+              Se o e-mail informado existir, você receberá um link para redefinir sua senha.
             </p>
             <p className="text-xs text-muted-foreground text-center">
               Não recebeu o e-mail? Verifique sua pasta de spam ou tente novamente.
