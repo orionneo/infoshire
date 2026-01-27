@@ -22,7 +22,7 @@ interface AuthContextType {
   loading: boolean;
   signInWithUsername: (username: string, password: string) => Promise<{ error: Error | null }>;
   signUpWithUsername: (username: string, password: string) => Promise<{ error: Error | null }>;
-  signUpWithEmail: (data: { name: string; phone: string; email?: string; password: string }) => Promise<{ error: Error | null }>;
+  signUpWithEmail: (data: { name: string; phone: string; email: string; password: string }) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -104,6 +104,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const normalizeBrazilPhoneToWaDigits = (input: string): string | null => {
+    const digits = input.replace(/\D/g, '');
+    if (!digits) {
+      return null;
+    }
+    const normalized = digits.startsWith('55') ? digits : `55${digits}`;
+    if (normalized.length === 12 || normalized.length === 13) {
+      return normalized;
+    }
+    return null;
+  };
+
   const signInWithUsername = async (username: string, password: string) => {
     try {
       // Check if username is an email
@@ -137,23 +149,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUpWithEmail = async (data: { name: string; phone: string; email?: string; password: string }) => {
+  const signUpWithEmail = async (data: { name: string; phone: string; email: string; password: string }) => {
     try {
-      // Se não tiver email, gerar um baseado no telefone
-      const email = data.email || `${data.phone.replace(/\D/g, '')}@temp.infoshire.com`;
-      
-      const { error } = await supabase.auth.signUp({
+      const name = data.name.trim();
+      const phoneInput = data.phone.trim();
+      const email = data.email.trim();
+      const normalizedPhone = normalizeBrazilPhoneToWaDigits(phoneInput);
+
+      if (!normalizedPhone) {
+        return { error: new Error('Informe DDD + número (ex: 19 99798-8952).') };
+      }
+
+      const { data: authData, error } = await supabase.auth.signUp({
         email,
         password: data.password,
         options: {
           data: {
-            name: data.name,
-            phone: data.phone,
+            name,
+            phone: normalizedPhone,
           },
         },
       });
 
       if (error) throw error;
+      const user = authData.user ?? authData.session?.user;
+
+      if (user) {
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          email,
+          name,
+          phone: normalizedPhone,
+          role: 'client',
+        });
+
+        if (profileError) {
+          console.warn('Profile upsert failed:', profileError);
+        }
+      }
       return { error: null };
     } catch (error) {
       return { error: error as Error };
