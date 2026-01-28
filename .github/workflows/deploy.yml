@@ -38,8 +38,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: SPA fallback for GitHub Pages
-        run: cp dist/index.html dist/404.html
+      - name: Verify SPA fallback file
+        run: test -f dist/404.html
 
       - name: Add CNAME for custom domain
         run: echo "infoshire.com.br" > dist/CNAME
