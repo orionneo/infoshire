@@ -11,11 +11,12 @@ export async function getProfile(userId: string): Promise<Profile | null> {
     .maybeSingle();
 
   if (error) {
-    console.error('获取用户信息失败:', error);
+    console.error('Failed to fetch profile:', error);
     return null;
   }
   return data;
 }
+
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
@@ -33,13 +34,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const normalizeBrazilPhoneToWaDigits = (input: string): string | null => {
   const digits = input.replace(/\D/g, '');
-  if (!digits) {
-    return null;
-  }
+  if (!digits) return null;
+
   const normalized = digits.startsWith('55') ? digits : `55${digits}`;
-  if (normalized.length === 12 || normalized.length === 13) {
-    return normalized;
-  }
+  if (normalized.length === 12 || normalized.length === 13) return normalized;
+
   return null;
 };
 
@@ -47,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+
   const processAuthRedirect = () => {
     const url = new URL(window.location.href);
     const hasAuthHash = url.hash.includes('access_token=');
@@ -59,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const authWithUrl = supabase.auth as typeof supabase.auth & {
       getSessionFromUrl?: (options?: { storeSession?: boolean }) => Promise<{ error: unknown }>;
     };
+
     const clearUrl = () => {
       if (url.hash || url.searchParams.has('code') || url.searchParams.has('next')) {
         url.hash = '';
@@ -69,11 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     if (typeof authWithUrl.getSessionFromUrl === 'function') {
-      return authWithUrl.getSessionFromUrl({ storeSession: true })
+      return authWithUrl
+        .getSessionFromUrl({ storeSession: true })
         .then(({ error }) => {
-          if (error) {
-            console.warn('Auth redirect session failed:', error);
-          }
+          if (error) console.warn('Auth redirect session failed:', error);
           clearUrl();
           return true;
         })
@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
     }
 
+    // Fallback manual (implicit flow hash tokens)
     if (hasAuthHash) {
       const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
       const accessToken = hashParams.get('access_token');
@@ -94,11 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return Promise.resolve(false);
       }
 
-      return supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      return supabase.auth
+        .setSession({ access_token: accessToken, refresh_token: refreshToken })
         .then(({ error }) => {
-          if (error) {
-            console.warn('Auth redirect session failed:', error);
-          }
+          if (error) console.warn('Auth redirect session failed:', error);
           clearUrl();
           return true;
         })
@@ -109,17 +109,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
     }
 
+    // Fallback PKCE (code)
     const code = url.searchParams.get('code');
     if (!code) {
       clearUrl();
       return Promise.resolve(false);
     }
 
-    return supabase.auth.exchangeCodeForSession(code)
+    return supabase.auth
+      .exchangeCodeForSession(code)
       .then(({ error }) => {
-        if (error) {
-          console.warn('Auth redirect session failed:', error);
-        }
+        if (error) console.warn('Auth redirect session failed:', error);
         clearUrl();
         return true;
       })
@@ -135,52 +135,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       return;
     }
-
     const profileData = await getProfile(user.id);
     setProfile(profileData);
   };
 
   useEffect(() => {
-    const isAdminPath = window.location.pathname.startsWith('/admin');
-
-    if (isAdminPath) {
-      let pendingReadySignals = 2;
-      const markReady = () => {
-        pendingReadySignals -= 1;
-        if (pendingReadySignals <= 0) {
-          setLoading(false);
-        }
-      };
-
-      processAuthRedirect().then(() => {
-        markReady();
-      });
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          getProfile(session.user.id).then(setProfile);
-        }
-        markReady();
-      });
-      // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          getProfile(session.user.id).then(setProfile);
-        } else {
-          setProfile(null);
-        }
-      });
-
-      return () => subscription.unsubscribe();
-    }
-
     let pendingReadySignals = 2;
     const markReady = () => {
       pendingReadySignals -= 1;
-      if (pendingReadySignals <= 0) {
-        setLoading(false);
-      }
+      if (pendingReadySignals <= 0) setLoading(false);
     };
 
     processAuthRedirect().then(() => {
@@ -196,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       markReady();
     });
+
     // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
@@ -211,11 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithUsername = async (username: string, password: string) => {
     try {
-      // Check if username is an email
       const normalizedUsername = username.trim();
       const isEmail = normalizedUsername.includes('@');
       const email = isEmail ? normalizedUsername.toLowerCase() : `${normalizedUsername}@miaoda.com`;
-      
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -230,7 +193,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUpWithUsername = async (username: string, password: string) => {
     try {
-      const email = `${username}@miaoda.com`;
+      const normalizedUsername = username.trim();
+      const isEmail = normalizedUsername.includes('@');
+      const email = isEmail ? normalizedUsername.toLowerCase() : `${normalizedUsername}@miaoda.com`;
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -247,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const name = data.name.trim();
       const phoneInput = data.phone.trim();
-      const email = data.email.trim();
+      const email = data.email.trim().toLowerCase();
       const normalizedPhone = normalizeBrazilPhoneToWaDigits(phoneInput);
 
       if (!normalizedPhone) {
@@ -266,11 +232,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) throw error;
-      const user = authData.user ?? authData.session?.user;
 
-      if (user) {
+      const createdUser = authData.user ?? authData.session?.user;
+
+      if (createdUser) {
         const { error: profileError } = await supabase.from('profiles').upsert({
-          id: user.id,
+          id: createdUser.id,
           email,
           name,
           phone: normalizedPhone,
@@ -281,6 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.warn('Profile upsert failed:', profileError);
         }
       }
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -289,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      // Usar canonical origin para evitar mistura de www/non-www
+      // Use canonical origin to avoid mixing www/non-www
       const canonicalOrigin = window.location.origin;
       const searchParams = new URLSearchParams(window.location.search);
       const rawNext = searchParams.get('next');
@@ -318,19 +286,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const ensureProfileForOAuthUser = async (oauthUser: User): Promise<Profile | null> => {
     const normalizedEmail = (oauthUser.email ?? '').trim().toLowerCase();
-    const displayName = (oauthUser.user_metadata?.name
-      || oauthUser.user_metadata?.full_name
-      || '').trim();
+    const displayName = (oauthUser.user_metadata?.name || oauthUser.user_metadata?.full_name || '').trim();
+
     const existingProfile = await getProfile(oauthUser.id);
     const existingPhone = existingProfile?.phone ?? null;
 
-    const { error } = await supabase.from('profiles').upsert({
-      id: oauthUser.id,
-      email: normalizedEmail,
-      name: displayName,
-      role: 'client',
-      phone: existingPhone,
-    }, { onConflict: 'id' });
+    const { error } = await supabase.from('profiles').upsert(
+      {
+        id: oauthUser.id,
+        email: normalizedEmail,
+        name: displayName,
+        role: 'client',
+        phone: existingPhone,
+      },
+      { onConflict: 'id' },
+    );
 
     if (error) {
       console.warn('Profile upsert failed:', error);
@@ -348,7 +318,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signInWithUsername, signUpWithUsername, signUpWithEmail, signInWithGoogle, signOut, refreshProfile, ensureProfileForOAuthUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        loading,
+        signInWithUsername,
+        signUpWithUsername,
+        signUpWithEmail,
+        signInWithGoogle,
+        signOut,
+        refreshProfile,
+        ensureProfileForOAuthUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
