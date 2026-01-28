@@ -34,7 +34,7 @@ import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import Services from './pages/Services';
 import TrackOrder from './pages/TrackOrder';
-import AuthCallback from './pages/auth/AuthCallback';
+import AuthCallback from './pages/AuthCallback';
 
 interface RouteConfig {
   name: string;
