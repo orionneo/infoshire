@@ -15,14 +15,15 @@ import {
   User,
   Wrench,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { getClientOrders, getClientStats, getProfile } from '@/db/api';
+import { getClientOrders, getClientStats, getProfile, updateProfile } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import type { Profile, ServiceOrderWithClient } from '@/types/types';
 
@@ -35,12 +36,19 @@ export default function ClientProfile() {
   const [orders, setOrders] = useState<ServiceOrderWithClient[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [phoneDraft, setPhoneDraft] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadClientData();
     }
   }, [id]);
+
+  useEffect(() => {
+    setPhoneDraft(client?.phone || '');
+  }, [client]);
 
   const loadClientData = async () => {
     if (!id) return;
@@ -65,6 +73,46 @@ export default function ClientProfile() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStartEdit = () => {
+    setPhoneDraft(client?.phone || '');
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setPhoneDraft(client?.phone || '');
+    setIsEditing(false);
+  };
+
+  const handleSaveClient = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!client) return;
+
+    const normalizedPhone = phoneDraft.replace(/\D/g, '');
+
+    setSaving(true);
+    try {
+      const updatedClient = await updateProfile(client.id, {
+        phone: normalizedPhone ? normalizedPhone : null,
+      });
+
+      setClient(updatedClient);
+      setIsEditing(false);
+      toast({
+        title: 'Cliente atualizado',
+        description: 'As informações do cliente foram salvas com sucesso.',
+      });
+    } catch (error: any) {
+      console.error('Erro ao atualizar cliente:', error);
+      toast({
+        title: 'Erro ao atualizar cliente',
+        description: error.message || 'Não foi possível salvar as informações do cliente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -125,13 +173,42 @@ export default function ClientProfile() {
             Voltar para Clientes
           </Button>
           <Button
-            onClick={() => navigate(`/admin/clients/${id}/edit`)}
+            onClick={handleStartEdit}
             className="gap-2"
           >
             <Edit className="h-4 w-4" />
             Editar Cliente
           </Button>
         </div>
+
+        {isEditing && (
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle>Editar Telefone</CardTitle>
+              <CardDescription>Atualize o telefone do cliente sem sair desta página.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveClient} className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Telefone</p>
+                  <Input
+                    value={phoneDraft}
+                    onChange={(event) => setPhoneDraft(event.target.value)}
+                    placeholder="(00) 00000-0000"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={saving}>
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleCancelEdit} disabled={saving}>
+                    Cancelar
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Informações do Cliente */}
         <Card className="border-2">
@@ -301,7 +378,7 @@ export default function ClientProfile() {
               <Button
                 variant="outline"
                 className="w-full justify-start gap-2"
-                onClick={() => navigate(`/admin/clients/${id}/edit`)}
+                onClick={handleStartEdit}
               >
                 <Edit className="h-4 w-4" />
                 Editar Informações
