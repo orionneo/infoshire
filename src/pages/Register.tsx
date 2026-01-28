@@ -273,7 +273,6 @@ export default function Register() {
             variant="outline"
             className="w-full"
             onClick={handleGoogleLogin}
-            disabled
           >
             {googleLoading ? (
               <>
