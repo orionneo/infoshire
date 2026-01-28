@@ -15,7 +15,7 @@ import {
   User,
   Wrench,
 } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
@@ -39,6 +39,7 @@ export default function ClientProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [phoneDraft, setPhoneDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  const editButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -49,6 +50,28 @@ export default function ClientProfile() {
   useEffect(() => {
     setPhoneDraft(client?.phone || '');
   }, [client]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (!editButtonRef.current) return;
+
+    const button = editButtonRef.current;
+    const checkOverlay = () => {
+      const rect = button.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const elementAtPoint = document.elementFromPoint(centerX, centerY);
+
+      if (elementAtPoint && !button.contains(elementAtPoint)) {
+        console.warn('[ClientProfile] Edit button blocked by:', elementAtPoint);
+      }
+    };
+
+    const frame = requestAnimationFrame(checkOverlay);
+    return () => cancelAnimationFrame(frame);
+  }, [isEditing, loading]);
 
   const loadClientData = async () => {
     if (!id) return;
@@ -163,7 +186,7 @@ export default function ClientProfile() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header com botão voltar */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between relative z-50">
           <Button
             variant="ghost"
             onClick={() => navigate('/admin/clients')}
@@ -174,7 +197,9 @@ export default function ClientProfile() {
           </Button>
           <Button
             onClick={handleStartEdit}
-            className="gap-2"
+            className="gap-2 pointer-events-auto"
+            type="button"
+            ref={editButtonRef}
           >
             <Edit className="h-4 w-4" />
             Editar Cliente
@@ -212,7 +237,7 @@ export default function ClientProfile() {
 
         {/* Informações do Cliente */}
         <Card className="border-2">
-          <CardHeader className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+          <CardHeader className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent pointer-events-none">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
                 <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
@@ -377,8 +402,9 @@ export default function ClientProfile() {
               </Button>
               <Button
                 variant="outline"
-                className="w-full justify-start gap-2"
+                className="w-full justify-start gap-2 pointer-events-auto"
                 onClick={handleStartEdit}
+                type="button"
               >
                 <Edit className="h-4 w-4" />
                 Editar Informações
