@@ -19,6 +19,7 @@ import WarrantySearch from './pages/admin/WarrantySearch';
 import WarrantyList from './pages/admin/WarrantyList';
 import BudgetApproval from './pages/BudgetApproval';
 import ChangePassword from './pages/ChangePassword';
+import CompleteProfile from './pages/CompleteProfile';
 import Contact from './pages/Contact';
 // Client pages
 import ClientDashboard from './pages/client/ClientDashboard';
@@ -108,6 +109,12 @@ const routes: RouteConfig[] = [
     name: 'AuthCallback',
     path: '/auth/callback',
     element: <AuthCallback />,
+    visible: false,
+  },
+  {
+    name: 'Complete Profile',
+    path: '/complete-profile',
+    element: <CompleteProfile />,
     visible: false,
   },
   

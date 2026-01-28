@@ -33,7 +33,7 @@ function matchPublicRoute(path: string, patterns: string[]) {
 }
 
 export function RouteGuard({ children }: RouteGuardProps) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -44,8 +44,18 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
     if (!user && !isPublic) {
       navigate('/login', { state: { from: location.pathname }, replace: true });
+      return;
     }
-  }, [user, loading, location.pathname, navigate]);
+
+    const isAdminRoute = location.pathname.startsWith('/admin');
+    if (user && profile && !isAdminRoute && profile.role !== 'admin') {
+      const isClientRoute = location.pathname.startsWith('/client');
+      const isCompleteProfileRoute = location.pathname === '/complete-profile';
+      if (isClientRoute && !profile.phone && !isCompleteProfileRoute) {
+        navigate('/complete-profile', { replace: true });
+      }
+    }
+  }, [user, profile, loading, location.pathname, navigate]);
 
   if (loading) {
     return (

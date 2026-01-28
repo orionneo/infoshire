@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/db/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const { ensureProfileForOAuthUser } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const { code, next } = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -25,8 +27,17 @@ export default function AuthCallback() {
         if (!session) {
           throw new Error('Sessão não encontrada após autenticação.');
         }
+        const profileData = await ensureProfileForOAuthUser(session.user);
         // Limpa querystring
         window.history.replaceState({}, '', '/auth/callback');
+        if (profileData?.role === 'admin') {
+          navigate('/admin', { replace: true });
+          return;
+        }
+        if (!profileData?.phone) {
+          navigate('/complete-profile', { replace: true });
+          return;
+        }
         navigate(next, { replace: true });
       } catch (err) {
         // Não bloqueia, mas mostra erro
@@ -35,7 +46,7 @@ export default function AuthCallback() {
       }
     };
     run();
-  }, [code, next, navigate]);
+  }, [code, next, navigate, ensureProfileForOAuthUser]);
 
   return (
     <div style={{ padding: 40, textAlign: 'center' }}>
