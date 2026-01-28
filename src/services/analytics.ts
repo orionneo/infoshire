@@ -6,20 +6,58 @@ type SupabaseErrorLike = {
   message?: string;
 };
 
+const WARN_THROTTLE_MS = 60_000;
+const warnOnceByKey = new Map<string, number>();
+
 function isErrorWithCode(error: unknown, code: string): boolean {
   return typeof error === 'object' && error !== null && (error as SupabaseErrorLike).code === code;
 }
 
-function isConflictError(error: unknown): boolean {
-  if (isErrorWithCode(error, '23505')) {
+function isConflict409(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  const typedError = error as SupabaseErrorLike;
+
+  if (typedError.status === 409) {
     return true;
   }
 
-  return typeof error === 'object' && error !== null && (error as SupabaseErrorLike).status === 409;
+  if (typedError.code === '409') {
+    return true;
+  }
+
+  return Boolean(typedError.message?.includes('409'));
 }
 
-function isForeignKeyError(error: unknown): boolean {
+function isUniqueViolation(error: unknown): boolean {
+  return isErrorWithCode(error, '23505');
+}
+
+function isFk23503(error: unknown): boolean {
   return isErrorWithCode(error, '23503');
+}
+
+function isConflictOk(error: unknown): boolean {
+  return isConflict409(error) || isUniqueViolation(error);
+}
+
+function safeWarnOnce(key: string, payload?: unknown) {
+  const now = Date.now();
+  const lastWarnAt = warnOnceByKey.get(key);
+
+  if (lastWarnAt && now - lastWarnAt < WARN_THROTTLE_MS) {
+    return;
+  }
+
+  warnOnceByKey.set(key, now);
+  if (payload === undefined) {
+    console.warn(`[ANALYTICS] ${key}`);
+    return;
+  }
+
+  console.warn(`[ANALYTICS] ${key}`, payload);
 }
 
 // ============================================
@@ -169,7 +207,7 @@ export async function getGeolocation(): Promise<{ city: string | null; country: 
     });
 
     if (!response.ok) {
-      console.error('[ANALYTICS] Erro ao buscar geolocalização:', response.status);
+      safeWarnOnce('Erro ao buscar geolocalização', response.status);
       return { city: null, country: null };
     }
 
@@ -180,7 +218,7 @@ export async function getGeolocation(): Promise<{ city: string | null; country: 
       country: data.country_name || null,
     };
   } catch (error) {
-    console.error('[ANALYTICS] Erro ao buscar geolocalização:', error);
+    safeWarnOnce('Erro ao buscar geolocalização', error);
     return { city: null, country: null };
   }
 }
@@ -226,17 +264,17 @@ async function ensureAnalyticsSession(sessionId: string): Promise<boolean> {
       .upsert(payload, { onConflict: 'session_id' });
 
     if (error) {
-      if (isConflictError(error)) {
+      if (isConflictOk(error)) {
         return true;
       }
 
-      console.warn('[ANALYTICS] Erro ao garantir sessão:', error);
+      safeWarnOnce('Erro ao garantir sessão', error);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.warn('[ANALYTICS] Erro ao garantir sessão:', error);
+    safeWarnOnce('Erro ao garantir sessão', error);
     return false;
   }
 }
@@ -273,10 +311,8 @@ export async function trackSessionStart(): Promise<boolean> {
         referrer: document.referrer || null,
       });
 
-    if (sourceError) {
-      if (!isConflictError(sourceError)) {
-        console.warn('[ANALYTICS] Erro ao inserir origem:', sourceError);
-      }
+    if (sourceError && !isConflictOk(sourceError)) {
+      safeWarnOnce('Erro ao inserir origem', sourceError);
     }
 
     // Marcar sessão como iniciada
@@ -289,7 +325,7 @@ export async function trackSessionStart(): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('[ANALYTICS] Erro ao iniciar sessão:', error);
+    safeWarnOnce('Erro ao iniciar sessão', error);
     return false;
   }
 }
@@ -324,11 +360,11 @@ async function updateSessionDuration() {
       })
       .eq('session_id', sessionId);
 
-    if (error && !isConflictError(error)) {
-      console.warn('[ANALYTICS] Erro ao atualizar duração:', error);
+    if (error && !isConflictOk(error)) {
+      safeWarnOnce('Erro ao atualizar duração', error);
     }
   } catch (error) {
-    console.warn('[ANALYTICS] Erro ao atualizar duração:', error);
+    safeWarnOnce('Erro ao atualizar duração', error);
   }
 }
 
@@ -365,29 +401,29 @@ export async function trackPageView(path: string, title: string): Promise<boolea
     const { error } = await supabase.from('analytics_pageviews').insert([insertPayload]);
 
     if (error) {
-      if (isConflictError(error)) {
+      if (isConflictOk(error)) {
         trackedPages.add(pageKey);
         return true;
       }
 
-      if (isForeignKeyError(error)) {
+      if (isFk23503(error)) {
         const sessionEnsured = await ensureAnalyticsSession(sessionId);
         if (sessionEnsured) {
           const { error: retryError } = await supabase
             .from('analytics_pageviews')
             .insert([insertPayload]);
 
-          if (!retryError || isConflictError(retryError)) {
+          if (!retryError || isConflictOk(retryError)) {
             trackedPages.add(pageKey);
             return true;
           }
 
-          console.warn('[ANALYTICS] Erro ao rastrear pageview (retry):', retryError);
+          safeWarnOnce('Erro ao rastrear pageview (retry)', retryError);
           return false;
         }
       }
 
-      console.warn('[ANALYTICS] Erro ao rastrear pageview:', error);
+      safeWarnOnce('Erro ao rastrear pageview', error);
       return false;
     }
 
@@ -398,15 +434,13 @@ export async function trackPageView(path: string, title: string): Promise<boolea
       p_session_id: sessionId,
     });
 
-    if (updateError) {
-      if (!isConflictError(updateError)) {
-        console.warn('[ANALYTICS] Erro ao incrementar page_count:', updateError);
-      }
+    if (updateError && !isConflictOk(updateError)) {
+      safeWarnOnce('Erro ao incrementar page_count', updateError);
     }
 
     return true;
   } catch (error) {
-    console.warn('[ANALYTICS] Erro ao rastrear pageview:', error);
+    safeWarnOnce('Erro ao rastrear pageview', error);
     return false;
   }
 }
@@ -435,27 +469,49 @@ export async function trackEvent(
       return true; // Já rastreado
     }
 
-    const { error } = await supabase
-      .from('analytics_events')
-      .insert({
-        session_id: sessionId,
-        visitor_id: visitorId,
-        event_type: eventType,
-        event_label: eventLabel || null,
-        page_path: pagePath || window.location.pathname,
-      });
+    await ensureAnalyticsSession(sessionId);
+
+    const insertPayload = {
+      session_id: sessionId,
+      visitor_id: visitorId,
+      event_type: eventType,
+      event_label: eventLabel || null,
+      page_path: pagePath || window.location.pathname,
+    };
+
+    const { error } = await supabase.from('analytics_events').insert(insertPayload);
 
     if (error) {
-      if (!isConflictError(error)) {
-        console.warn('[ANALYTICS] Erro ao rastrear evento:', error);
+      if (isConflictOk(error)) {
+        trackedEvents.add(eventKey);
+        return true;
       }
+
+      if (isFk23503(error)) {
+        const sessionEnsured = await ensureAnalyticsSession(sessionId);
+        if (sessionEnsured) {
+          const { error: retryError } = await supabase
+            .from('analytics_events')
+            .insert(insertPayload);
+
+          if (!retryError || isConflictOk(retryError)) {
+            trackedEvents.add(eventKey);
+            return true;
+          }
+
+          safeWarnOnce('Erro ao rastrear evento (retry)', retryError);
+          return false;
+        }
+      }
+
+      safeWarnOnce('Erro ao rastrear evento', error);
       return false;
     }
 
     trackedEvents.add(eventKey);
     return true;
   } catch (error) {
-    console.warn('[ANALYTICS] Erro ao rastrear evento:', error);
+    safeWarnOnce('Erro ao rastrear evento', error);
     return false;
   }
 }
