@@ -11,13 +11,22 @@ export default function AuthCallback() {
         const currentUrl = window.location.href;
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
-        const rawNext = params.get('next') || '/client';
-        const isSafeNext = rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
-        const next = isSafeNext ? rawNext : '/client';
+        const rawNext = params.get('next');
+        const isSafeNext = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
+        const next = isSafeNext ? rawNext : null;
         const cleanUrl = `${window.location.origin}${window.location.pathname}`;
         window.history.replaceState({}, document.title, cleanUrl);
 
-        if (code) {
+        const authWithUrl = supabase.auth as typeof supabase.auth & {
+          getSessionFromUrl?: (options?: { storeSession?: boolean }) => Promise<{ error: unknown }>;
+        };
+
+        if (typeof authWithUrl.getSessionFromUrl === 'function') {
+          const { error: exchangeError } = await authWithUrl.getSessionFromUrl({ storeSession: true });
+          if (exchangeError) {
+            throw exchangeError;
+          }
+        } else if (code) {
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
           if (exchangeError) {
             throw exchangeError;
@@ -61,6 +70,10 @@ export default function AuthCallback() {
           console.error('Falha ao buscar perfil:', profileError);
         }
 
+        if (next) {
+          navigate(next, { replace: true });
+          return;
+        }
         if (profile?.role === 'admin') {
           navigate('/admin', { replace: true });
           return;
@@ -69,7 +82,7 @@ export default function AuthCallback() {
           navigate('/complete-profile', { replace: true });
           return;
         }
-        navigate(next, { replace: true });
+        navigate('/client', { replace: true });
       } catch (err) {
         console.error('Falha ao finalizar login:', err);
         navigate('/login', { replace: true });
