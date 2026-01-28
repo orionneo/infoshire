@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#000000" />
+    <script>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        const redirect = params.get("redirect");
+        if (redirect) {
+          window.history.replaceState(null, "", decodeURIComponent(redirect));
+        }
+      })();
+    </script>
     
     <!-- Security Headers -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
@@ -23,4 +32,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
