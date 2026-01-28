@@ -258,7 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       // Use canonical origin to avoid mixing www/non-www
-      const canonicalOrigin = window.location.origin;
+      const canonicalOrigin = 'https://www.infoshire.com.br';
       const searchParams = new URLSearchParams(window.location.search);
       const rawNext = searchParams.get('next');
       const isSafeNext = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
