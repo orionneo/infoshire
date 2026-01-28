@@ -26,9 +26,22 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  ensureProfileForOAuthUser: (oauthUser: User) => Promise<Profile | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const normalizeBrazilPhoneToWaDigits = (input: string): string | null => {
+  const digits = input.replace(/\D/g, '');
+  if (!digits) {
+    return null;
+  }
+  const normalized = digits.startsWith('55') ? digits : `55${digits}`;
+  if (normalized.length === 12 || normalized.length === 13) {
+    return normalized;
+  }
+  return null;
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -103,18 +116,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const normalizeBrazilPhoneToWaDigits = (input: string): string | null => {
-    const digits = input.replace(/\D/g, '');
-    if (!digits) {
-      return null;
-    }
-    const normalized = digits.startsWith('55') ? digits : `55${digits}`;
-    if (normalized.length === 12 || normalized.length === 13) {
-      return normalized;
-    }
-    return null;
-  };
 
   const signInWithUsername = async (username: string, password: string) => {
     try {
@@ -218,6 +219,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const ensureProfileForOAuthUser = async (oauthUser: User): Promise<Profile | null> => {
+    const normalizedEmail = (oauthUser.email ?? '').trim().toLowerCase();
+    const displayName = (oauthUser.user_metadata?.name
+      || oauthUser.user_metadata?.full_name
+      || '').trim();
+    const existingProfile = await getProfile(oauthUser.id);
+    const existingPhone = existingProfile?.phone ?? null;
+
+    const { error } = await supabase.from('profiles').upsert({
+      id: oauthUser.id,
+      email: normalizedEmail,
+      name: displayName,
+      role: 'client',
+      phone: existingPhone,
+    }, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Profile upsert failed:', error);
+    }
+
+    const profileData = await getProfile(oauthUser.id);
+    setProfile(profileData);
+    return profileData;
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -225,7 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signInWithUsername, signUpWithUsername, signUpWithEmail, signInWithGoogle, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, signInWithUsername, signUpWithUsername, signUpWithEmail, signInWithGoogle, signOut, refreshProfile, ensureProfileForOAuthUser }}>
       {children}
     </AuthContext.Provider>
   );

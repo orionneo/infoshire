@@ -9,25 +9,23 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 export default function Login() {
-  const { user, signInWithUsername, signInWithGoogle } = useAuth();
+  const { user, profile, signInWithUsername, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const adminEmail = 'admin@infoshire.com.br';
-  const isAdminEmail = (email?: string) => email?.trim().toLowerCase() === adminEmail;
 
   // Redireciona para a área do cliente se já estiver autenticado
   useEffect(() => {
     if (user) {
-      if (isAdminEmail(user.email)) {
+      if (profile?.role === 'admin') {
         navigate('/admin', { replace: true });
         return;
       }
       navigate('/client', { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, profile, navigate]);
 
   const form = useForm({
     defaultValues: {
@@ -73,8 +71,7 @@ export default function Login() {
       }
 
       // Redirecionar para a página anterior ou para o dashboard
-      const normalizedEmail = isEmail ? data.username.trim().toLowerCase() : undefined;
-      if (isAdminEmail(normalizedEmail)) {
+      if (profile?.role === 'admin') {
         navigate('/admin', { replace: true });
         return;
       }
@@ -209,9 +206,7 @@ export default function Login() {
             type="button"
             variant="outline"
             className="w-full"
-            title="Login com Google desativado no momento"
             onClick={handleGoogleLogin}
-            disabled
           >
             {googleLoading ? (
               <>
