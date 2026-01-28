@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/db/supabase';
-import { useAuth } from '@/contexts/AuthContext';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -9,20 +8,27 @@ export default function AuthCallback() {
   useEffect(() => {
     const run = async () => {
       try {
+        const currentUrl = window.location.href;
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
         const rawNext = params.get('next') || '/client';
         const isSafeNext = rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
         const next = isSafeNext ? rawNext : '/client';
-        if (!code) {
-          console.error('Código de autenticação ausente.');
-          navigate('/login', { replace: true });
-          return;
-        }
+        const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+        window.history.replaceState({}, document.title, cleanUrl);
 
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        if (exchangeError) {
-          throw exchangeError;
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            throw exchangeError;
+          }
+        } else {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(currentUrl);
+          if (exchangeError) {
+            console.warn('Código de autenticação ausente ou inválido.', exchangeError);
+            navigate('/login', { replace: true });
+            return;
+          }
         }
 
         const { data: sessionData } = await supabase.auth.getSession();
