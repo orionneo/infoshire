@@ -8,6 +8,7 @@ type SupabaseErrorLike = {
 
 const WARN_THROTTLE_MS = 60_000;
 const warnOnceByKey = new Map<string, number>();
+let analyticsDisabled = false;
 
 function isErrorWithCode(error: unknown, code: string): boolean {
   return typeof error === 'object' && error !== null && (error as SupabaseErrorLike).code === code;
@@ -41,6 +42,38 @@ function isFk23503(error: unknown): boolean {
 
 function isConflictOk(error: unknown): boolean {
   return isConflict409(error) || isUniqueViolation(error);
+}
+
+function isAuthOrRlsError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  const typedError = error as SupabaseErrorLike;
+  const status = typedError.status;
+
+  if (status === 401 || status === 403) {
+    return true;
+  }
+
+  if (typedError.code === '42501') {
+    return true;
+  }
+
+  return Boolean(typedError.message?.toLowerCase().includes('row-level security'));
+}
+
+function disableAnalytics(reason: string, error?: unknown) {
+  if (analyticsDisabled) {
+    return;
+  }
+
+  analyticsDisabled = true;
+  if (durationUpdateInterval) {
+    clearInterval(durationUpdateInterval);
+    durationUpdateInterval = null;
+  }
+  safeWarnOnce(`Analytics desativado: ${reason}`, error);
 }
 
 function safeWarnOnce(key: string, payload?: unknown) {
@@ -257,6 +290,10 @@ async function buildSessionPayload(sessionId: string) {
 }
 
 async function ensureAnalyticsSession(sessionId: string): Promise<boolean> {
+  if (analyticsDisabled) {
+    return false;
+  }
+
   try {
     const payload = await buildSessionPayload(sessionId);
     const { error } = await supabase
@@ -264,6 +301,10 @@ async function ensureAnalyticsSession(sessionId: string): Promise<boolean> {
       .upsert(payload, { onConflict: 'session_id' });
 
     if (error) {
+      if (isAuthOrRlsError(error)) {
+        disableAnalytics('sessão sem permissão', error);
+        return false;
+      }
       if (isConflictOk(error)) {
         return true;
       }
@@ -274,6 +315,10 @@ async function ensureAnalyticsSession(sessionId: string): Promise<boolean> {
 
     return true;
   } catch (error) {
+    if (isAuthOrRlsError(error)) {
+      disableAnalytics('sessão sem permissão', error);
+      return false;
+    }
     safeWarnOnce('Erro ao garantir sessão', error);
     return false;
   }
@@ -283,6 +328,10 @@ async function ensureAnalyticsSession(sessionId: string): Promise<boolean> {
  * Iniciar rastreamento de sessão
  */
 export async function trackSessionStart(): Promise<boolean> {
+  if (analyticsDisabled) {
+    return false;
+  }
+
   try {
     // Verificar se já iniciou sessão
     const SESSION_STARTED_KEY = 'analytics_session_started';
@@ -312,6 +361,10 @@ export async function trackSessionStart(): Promise<boolean> {
       });
 
     if (sourceError && !isConflictOk(sourceError)) {
+      if (isAuthOrRlsError(sourceError)) {
+        disableAnalytics('fonte sem permissão', sourceError);
+        return false;
+      }
       safeWarnOnce('Erro ao inserir origem', sourceError);
     }
 
@@ -325,6 +378,10 @@ export async function trackSessionStart(): Promise<boolean> {
 
     return true;
   } catch (error) {
+    if (isAuthOrRlsError(error)) {
+      disableAnalytics('sessão sem permissão', error);
+      return false;
+    }
     safeWarnOnce('Erro ao iniciar sessão', error);
     return false;
   }
@@ -334,6 +391,10 @@ export async function trackSessionStart(): Promise<boolean> {
  * Iniciar heartbeat para atualizar duração da sessão
  */
 function startDurationHeartbeat() {
+  if (analyticsDisabled) {
+    return;
+  }
+
   if (durationUpdateInterval) {
     clearInterval(durationUpdateInterval);
     durationUpdateInterval = null;
@@ -346,6 +407,10 @@ function startDurationHeartbeat() {
  * Atualizar duração da sessão
  */
 async function updateSessionDuration() {
+  if (analyticsDisabled) {
+    return;
+  }
+
   try {
     if (!sessionStartTime || !lastActivityTime) return;
 
@@ -361,9 +426,17 @@ async function updateSessionDuration() {
       .eq('session_id', sessionId);
 
     if (error && !isConflictOk(error)) {
+      if (isAuthOrRlsError(error)) {
+        disableAnalytics('duração sem permissão', error);
+        return;
+      }
       safeWarnOnce('Erro ao atualizar duração', error);
     }
   } catch (error) {
+    if (isAuthOrRlsError(error)) {
+      disableAnalytics('duração sem permissão', error);
+      return;
+    }
     safeWarnOnce('Erro ao atualizar duração', error);
   }
 }
@@ -378,6 +451,10 @@ const trackedPages = new Set<string>();
  * Rastrear visualização de página
  */
 export async function trackPageView(path: string, title: string): Promise<boolean> {
+  if (analyticsDisabled) {
+    return false;
+  }
+
   try {
     const sessionId = getSessionId();
     const visitorId = getOrCreateVisitorId();
@@ -401,6 +478,10 @@ export async function trackPageView(path: string, title: string): Promise<boolea
     const { error } = await supabase.from('analytics_pageviews').insert([insertPayload]);
 
     if (error) {
+      if (isAuthOrRlsError(error)) {
+        disableAnalytics('pageview sem permissão', error);
+        return false;
+      }
       if (isConflictOk(error)) {
         trackedPages.add(pageKey);
         return true;
@@ -408,6 +489,9 @@ export async function trackPageView(path: string, title: string): Promise<boolea
 
       if (isFk23503(error)) {
         const sessionEnsured = await ensureAnalyticsSession(sessionId);
+        if (analyticsDisabled) {
+          return false;
+        }
         if (sessionEnsured) {
           const { error: retryError } = await supabase
             .from('analytics_pageviews')
@@ -418,6 +502,10 @@ export async function trackPageView(path: string, title: string): Promise<boolea
             return true;
           }
 
+          if (isAuthOrRlsError(retryError)) {
+            disableAnalytics('pageview retry sem permissão', retryError);
+            return false;
+          }
           safeWarnOnce('Erro ao rastrear pageview (retry)', retryError);
           return false;
         }
@@ -435,11 +523,19 @@ export async function trackPageView(path: string, title: string): Promise<boolea
     });
 
     if (updateError && !isConflictOk(updateError)) {
+      if (isAuthOrRlsError(updateError)) {
+        disableAnalytics('page_count sem permissão', updateError);
+        return false;
+      }
       safeWarnOnce('Erro ao incrementar page_count', updateError);
     }
 
     return true;
   } catch (error) {
+    if (isAuthOrRlsError(error)) {
+      disableAnalytics('pageview sem permissão', error);
+      return false;
+    }
     safeWarnOnce('Erro ao rastrear pageview', error);
     return false;
   }
@@ -459,6 +555,10 @@ export async function trackEvent(
   eventLabel?: string,
   pagePath?: string
 ): Promise<boolean> {
+  if (analyticsDisabled) {
+    return false;
+  }
+
   try {
     const sessionId = getSessionId();
     const visitorId = getOrCreateVisitorId();
@@ -482,6 +582,10 @@ export async function trackEvent(
     const { error } = await supabase.from('analytics_events').insert(insertPayload);
 
     if (error) {
+      if (isAuthOrRlsError(error)) {
+        disableAnalytics('evento sem permissão', error);
+        return false;
+      }
       if (isConflictOk(error)) {
         trackedEvents.add(eventKey);
         return true;
@@ -489,6 +593,9 @@ export async function trackEvent(
 
       if (isFk23503(error)) {
         const sessionEnsured = await ensureAnalyticsSession(sessionId);
+        if (analyticsDisabled) {
+          return false;
+        }
         if (sessionEnsured) {
           const { error: retryError } = await supabase
             .from('analytics_events')
@@ -499,6 +606,10 @@ export async function trackEvent(
             return true;
           }
 
+          if (isAuthOrRlsError(retryError)) {
+            disableAnalytics('evento retry sem permissão', retryError);
+            return false;
+          }
           safeWarnOnce('Erro ao rastrear evento (retry)', retryError);
           return false;
         }
@@ -511,6 +622,10 @@ export async function trackEvent(
     trackedEvents.add(eventKey);
     return true;
   } catch (error) {
+    if (isAuthOrRlsError(error)) {
+      disableAnalytics('evento sem permissão', error);
+      return false;
+    }
     safeWarnOnce('Erro ao rastrear evento', error);
     return false;
   }
