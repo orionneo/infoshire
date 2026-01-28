@@ -42,6 +42,26 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { ApprovalHistory, OrderStatus, OrderStatusHistoryWithUser, ServiceOrderItem, ServiceOrderWithClient } from '@/types/types';
 
+const formatWhatsAppPhone = (phone: string) => {
+  let phoneNumber = phone.replace(/\D/g, '');
+
+  if (phoneNumber.length === 11 && !phoneNumber.startsWith('55')) {
+    phoneNumber = `55${phoneNumber}`;
+  } else if (phoneNumber.length === 10 && !phoneNumber.startsWith('55')) {
+    phoneNumber = `55${phoneNumber}`;
+  }
+
+  return phoneNumber;
+};
+
+const buildWhatsAppUrl = (phone: string | null | undefined, message: string) => {
+  if (!phone) return '';
+
+  const phoneNumber = formatWhatsAppPhone(phone);
+
+  return phoneNumber ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}` : '';
+};
+
 export default function AdminOrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -58,6 +78,13 @@ export default function AdminOrderDetail() {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDiagnostic, setShowDiagnostic] = useState(false);
+  const [whatsappSettings, setWhatsappSettings] = useState({
+    budgetRequestTemplate: '',
+    readyForPickupTemplate: '',
+    notApprovedTemplate: '',
+    businessAddress: '',
+    businessHours: '',
+  });
 
   const editForm = useForm({
     defaultValues: {
@@ -96,6 +123,38 @@ export default function AdminOrderDetail() {
       loadAdditionalItems();
     }
   }, [id]);
+
+  useEffect(() => {
+    const loadWhatsAppSettings = async () => {
+      try {
+        const [
+          budgetRequestTemplate,
+          readyForPickupTemplate,
+          notApprovedTemplate,
+          businessAddress,
+          businessHours,
+        ] = await Promise.all([
+          getSystemSetting('whatsapp_template_budget_request'),
+          getSystemSetting('whatsapp_template_ready_for_pickup'),
+          getSystemSetting('whatsapp_template_not_approved'),
+          getSystemSetting('business_address'),
+          getSystemSetting('business_hours'),
+        ]);
+
+        setWhatsappSettings({
+          budgetRequestTemplate: budgetRequestTemplate || '',
+          readyForPickupTemplate: readyForPickupTemplate || '',
+          notApprovedTemplate: notApprovedTemplate || '',
+          businessAddress: businessAddress || '',
+          businessHours: businessHours || '',
+        });
+      } catch (error) {
+        console.error('Erro ao carregar configurações do WhatsApp:', error);
+      }
+    };
+
+    loadWhatsAppSettings();
+  }, []);
 
   useEffect(() => {
     if (order) {
@@ -250,18 +309,83 @@ export default function AdminOrderDetail() {
     if (!order || !id || !user) return;
 
     setUpdating(true);
-    let whatsappUrl = ''; // Declare at function scope to use later
-    
+    const isAwaitingApproval = data.status === 'awaiting_approval';
+    const isReadyForPickup = data.status === 'ready_for_pickup';
+    const isNotApproved = data.status === 'not_approved';
+    const laborCost = isAwaitingApproval ? parseFloat(data.labor_cost) || 0 : 0;
+    const partsCost = isAwaitingApproval ? parseFloat(data.parts_cost) || 0 : 0;
+    const totalCost = laborCost + partsCost;
+    const newApprovalToken = isAwaitingApproval ? crypto.randomUUID() : '';
+    const approvalUrl = newApprovalToken ? `${window.location.origin}/approve/${newApprovalToken}` : '';
+    const { budgetRequestTemplate, readyForPickupTemplate, notApprovedTemplate, businessAddress, businessHours } = whatsappSettings;
+    let whatsappUrl = '';
+
+    if (order.client.phone) {
+      if (isAwaitingApproval && budgetRequestTemplate) {
+        const formattedLaborCost = laborCost.toFixed(2).replace('.', ',');
+        const formattedPartsCost = partsCost.toFixed(2).replace('.', ',');
+        const formattedTotalCost = totalCost.toFixed(2).replace('.', ',');
+        const formattedObservations = data.budget_notes
+          ? `📝 *Observações:*\n${data.budget_notes}\n\n`
+          : '';
+        const whatsappMessage = budgetRequestTemplate
+          .replace(/{nome_cliente}/g, order.client.name || 'Cliente')
+          .replace(/{cliente_nome}/g, order.client.name || 'Cliente')
+          .replace(/{numero_os}/g, order.order_number)
+          .replace(/{equipamento}/g, order.equipment)
+          .replace(/{valor_mao_obra}/g, formattedLaborCost)
+          .replace(/{valor_pecas}/g, formattedPartsCost)
+          .replace(/{valor_total}/g, formattedTotalCost)
+          .replace(/{observacoes}/g, formattedObservations)
+          .replace(/{link_aprovacao}/g, approvalUrl);
+
+        whatsappUrl = buildWhatsAppUrl(order.client.phone, whatsappMessage);
+      }
+
+      if (isReadyForPickup && readyForPickupTemplate) {
+        const whatsappMessage = readyForPickupTemplate
+          .replace(/{nome_cliente}/g, order.client.name || 'Cliente')
+          .replace(/{cliente_nome}/g, order.client.name || 'Cliente')
+          .replace(/{numero_os}/g, order.order_number)
+          .replace(/{equipamento}/g, order.equipment)
+          .replace(/{endereco}/g, businessAddress)
+          .replace(/{address}/g, businessAddress)
+          .replace(/{horario}/g, businessHours)
+          .replace(/{business_hours}/g, businessHours)
+          .replace(/{valor_total}/g, order.total_cost ? `💰 *Valor total:* R$ ${order.total_cost.toFixed(2).replace('.', ',')}\n` : '')
+          .replace(/{desconto}/g, order.discount_amount && order.discount_amount > 0 ? `🎁 *Desconto aplicado:* R$ ${order.discount_amount.toFixed(2).replace('.', ',')}\n` : '')
+          .replace(/{valor_final}/g, order.discount_amount && order.discount_amount > 0 && order.total_cost ? `✨ *Valor final:* R$ ${(order.total_cost - order.discount_amount).toFixed(2).replace('.', ',')}\n\n` : '')
+          .replace(/{observacoes}/g, data.notes ? `📝 *Observações:*\n${data.notes}\n\n` : '');
+
+        whatsappUrl = buildWhatsAppUrl(order.client.phone, whatsappMessage);
+      }
+
+      if (isNotApproved && notApprovedTemplate) {
+        const whatsappMessage = notApprovedTemplate
+          .replace(/{nome_cliente}/g, order.client.name || 'Cliente')
+          .replace(/{cliente_nome}/g, order.client.name || 'Cliente')
+          .replace(/{numero_os}/g, order.order_number)
+          .replace(/{equipamento}/g, order.equipment)
+          .replace(/{endereco}/g, businessAddress)
+          .replace(/{address}/g, businessAddress)
+          .replace(/{horario}/g, businessHours)
+          .replace(/{business_hours}/g, businessHours)
+          .replace(/{observacoes}/g, data.notes ? `📝 Observações: ${data.notes}\n\n` : '');
+
+        whatsappUrl = buildWhatsAppUrl(order.client.phone, whatsappMessage);
+      }
+    }
+
     try {
+      if ((isAwaitingApproval || isReadyForPickup || isNotApproved) && whatsappUrl) {
+        const openedWindow = window.open(whatsappUrl, '_blank');
+        if (!openedWindow) {
+          window.location.href = whatsappUrl;
+        }
+      }
+
       // If status is awaiting_approval, update budget fields and generate NEW approval token
-      if (data.status === 'awaiting_approval') {
-        const laborCost = parseFloat(data.labor_cost) || 0;
-        const partsCost = parseFloat(data.parts_cost) || 0;
-        const totalCost = laborCost + partsCost;
-
-        // Generate a NEW approval token for this budget request
-        const newApprovalToken = crypto.randomUUID();
-
+      if (isAwaitingApproval) {
         await updateServiceOrder(id, {
           status: data.status,
           labor_cost: laborCost,
@@ -272,16 +396,6 @@ export default function AdminOrderDetail() {
           budget_approved: false, // Reset approval status for new budget
           approved_at: null, // Clear previous approval date
         });
-
-        // Get updated order with new approval token
-        const updatedOrder = await getServiceOrder(id);
-        
-        if (!updatedOrder) {
-          throw new Error('Ordem de serviço não encontrada');
-        }
-        
-        // Generate approval link with NEW token
-        const approvalUrl = `${window.location.origin}/approve/${updatedOrder.approval_token}`;
         
         // Create message in chat with budget details and approval link
         const budgetMessage = `🔔 *ORÇAMENTO DISPONÍVEL*
@@ -314,65 +428,22 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
         
         // Generate WhatsApp message only if phone exists
         if (order.client.phone) {
-          // Get WhatsApp template from settings
-          const whatsappTemplate = await getSystemSetting('whatsapp_template_budget_request');
-          
           // Warn if template not configured but continue
-          if (!whatsappTemplate) {
+          if (!budgetRequestTemplate) {
             toast({
               title: 'Aviso',
               description: 'Template de orçamento não configurado. Configure em Admin > Configurações > WhatsApp para enviar mensagens automáticas.',
               variant: 'default',
             });
             console.warn('Template de orçamento não configurado');
-          } else {
-            // Format values
-            const formattedLaborCost = laborCost.toFixed(2).replace('.', ',');
-            const formattedPartsCost = partsCost.toFixed(2).replace('.', ',');
-            const formattedTotalCost = totalCost.toFixed(2).replace('.', ',');
-            
-            // Format observations (add line break if exists)
-            const formattedObservations = data.budget_notes 
-              ? `📝 *Observações:*\n${data.budget_notes}\n\n` 
-              : '';
-
-            // Replace template variables (support both formats for flexibility)
-            const whatsappMessage = whatsappTemplate
-              .replace(/{nome_cliente}/g, order.client.name || 'Cliente')
-              .replace(/{cliente_nome}/g, order.client.name || 'Cliente')
-              .replace(/{numero_os}/g, order.order_number)
-              .replace(/{equipamento}/g, order.equipment)
-              .replace(/{valor_mao_obra}/g, formattedLaborCost)
-              .replace(/{valor_pecas}/g, formattedPartsCost)
-              .replace(/{valor_total}/g, formattedTotalCost)
-              .replace(/{observacoes}/g, formattedObservations)
-              .replace(/{link_aprovacao}/g, approvalUrl);
-
-            // Format phone number for WhatsApp/WhatsApp Business (remove all non-digits and ensure it starts with country code)
-            let phoneNumber = order.client.phone.replace(/\D/g, '');
-            
-            // If phone doesn't start with country code, add 55 (Brazil)
-            if (phoneNumber.length === 11 && !phoneNumber.startsWith('55')) {
-              phoneNumber = '55' + phoneNumber;
-            } else if (phoneNumber.length === 10 && !phoneNumber.startsWith('55')) {
-              phoneNumber = '55' + phoneNumber;
-            }
-            
-            // Use wa.me format which works better with WhatsApp Business
-            whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(whatsappMessage)}`;
           }
         }
-      } else if (data.status === 'ready_for_pickup') {
+      } else if (isReadyForPickup) {
         // Update status first
         await updateServiceOrderStatus(id, data.status, data.notes || null, user.id);
         
-        // Get template and business info from settings
-        const whatsappTemplate = await getSystemSetting('whatsapp_template_ready_for_pickup');
-        const businessAddress = await getSystemSetting('business_address') || '';
-        const businessHours = await getSystemSetting('business_hours') || '';
-        
         // Warn if template not configured but continue with status update
-        if (!whatsappTemplate) {
+        if (!readyForPickupTemplate) {
           toast({
             title: 'Aviso',
             description: 'Template de WhatsApp não configurado. Configure em Admin > Configurações > WhatsApp para enviar mensagens automáticas.',
@@ -381,7 +452,7 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
           console.warn('Template de WhatsApp não configurado');
         } else {
           // Create message in chat notifying client that equipment is ready (support both variable formats)
-          const pickupMessage = whatsappTemplate
+          const pickupMessage = readyForPickupTemplate
             .replace(/{nome_cliente}/g, order.client.name || 'Cliente')
             .replace(/{cliente_nome}/g, order.client.name || 'Cliente')
             .replace(/{numero_os}/g, order.order_number)
@@ -400,49 +471,13 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
             sender_id: user.id,
             content: pickupMessage,
           });
-
-          // Generate WhatsApp message only if phone exists
-          if (order.client.phone) {
-            // Use the same template with same variable replacements (support both formats)
-            const whatsappMessage = whatsappTemplate
-              .replace(/{nome_cliente}/g, order.client.name || 'Cliente')
-              .replace(/{cliente_nome}/g, order.client.name || 'Cliente')
-              .replace(/{numero_os}/g, order.order_number)
-              .replace(/{equipamento}/g, order.equipment)
-              .replace(/{endereco}/g, businessAddress)
-              .replace(/{address}/g, businessAddress)
-              .replace(/{horario}/g, businessHours)
-              .replace(/{business_hours}/g, businessHours)
-              .replace(/{valor_total}/g, order.total_cost ? `💰 *Valor total:* R$ ${order.total_cost.toFixed(2).replace('.', ',')}\n` : '')
-              .replace(/{desconto}/g, order.discount_amount && order.discount_amount > 0 ? `🎁 *Desconto aplicado:* R$ ${order.discount_amount.toFixed(2).replace('.', ',')}\n` : '')
-              .replace(/{valor_final}/g, order.discount_amount && order.discount_amount > 0 && order.total_cost ? `✨ *Valor final:* R$ ${(order.total_cost - order.discount_amount).toFixed(2).replace('.', ',')}\n\n` : '')
-              .replace(/{observacoes}/g, data.notes ? `📝 *Observações:*\n${data.notes}\n\n` : '');
-
-            // Format phone number for WhatsApp/WhatsApp Business (remove all non-digits and ensure it starts with country code)
-            let phoneNumber = order.client.phone.replace(/\D/g, '');
-            
-            // If phone doesn't start with country code, add 55 (Brazil)
-            if (phoneNumber.length === 11 && !phoneNumber.startsWith('55')) {
-              phoneNumber = '55' + phoneNumber;
-            } else if (phoneNumber.length === 10 && !phoneNumber.startsWith('55')) {
-              phoneNumber = '55' + phoneNumber;
-            }
-            
-            // Use wa.me format which works better with WhatsApp Business
-            whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(whatsappMessage)}`;
-          }
         }
-      } else if (data.status === 'not_approved') {
+      } else if (isNotApproved) {
         // Update status first
         await updateServiceOrderStatus(id, data.status, data.notes || null, user.id);
         
-        // Get template and business info from settings
-        const whatsappTemplate = await getSystemSetting('whatsapp_template_not_approved');
-        const businessAddress = await getSystemSetting('business_address') || '';
-        const businessHours = await getSystemSetting('business_hours') || '';
-        
         // Warn if template not configured but continue with status update
-        if (!whatsappTemplate) {
+        if (!notApprovedTemplate) {
           toast({
             title: 'Aviso',
             description: 'Template de orçamento não aprovado não configurado. Configure em Admin > Configurações > WhatsApp para enviar mensagens automáticas.',
@@ -451,7 +486,7 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
           console.warn('Template de orçamento não aprovado não configurado');
         } else {
           // Create message in chat notifying client that budget was not approved (support both variable formats)
-          const notApprovedMessage = whatsappTemplate
+          const notApprovedMessage = notApprovedTemplate
             .replace(/{nome_cliente}/g, order.client.name || 'Cliente')
             .replace(/{cliente_nome}/g, order.client.name || 'Cliente')
             .replace(/{numero_os}/g, order.order_number)
@@ -467,34 +502,6 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
             sender_id: user.id,
             content: notApprovedMessage,
           });
-
-          // Generate WhatsApp message only if phone exists
-          if (order.client.phone) {
-            // Use the same template with same variable replacements (support both formats)
-            const whatsappMessage = whatsappTemplate
-              .replace(/{nome_cliente}/g, order.client.name || 'Cliente')
-              .replace(/{cliente_nome}/g, order.client.name || 'Cliente')
-              .replace(/{numero_os}/g, order.order_number)
-              .replace(/{equipamento}/g, order.equipment)
-              .replace(/{endereco}/g, businessAddress)
-              .replace(/{address}/g, businessAddress)
-              .replace(/{horario}/g, businessHours)
-              .replace(/{business_hours}/g, businessHours)
-              .replace(/{observacoes}/g, data.notes ? `📝 Observações: ${data.notes}\n\n` : '');
-
-            // Format phone number for WhatsApp/WhatsApp Business
-            let phoneNumber = order.client.phone.replace(/\D/g, '');
-            
-            // If phone doesn't start with country code, add 55 (Brazil)
-            if (phoneNumber.length === 11 && !phoneNumber.startsWith('55')) {
-              phoneNumber = '55' + phoneNumber;
-            } else if (phoneNumber.length === 10 && !phoneNumber.startsWith('55')) {
-              phoneNumber = '55' + phoneNumber;
-            }
-            
-            // Use wa.me format which works better with WhatsApp Business
-            whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(whatsappMessage)}`;
-          }
         }
 
         // Send Telegram notification for not approved budget
@@ -554,23 +561,6 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
       statusForm.reset();
       loadOrder();
       loadHistory();
-
-      // Open WhatsApp after everything is saved (works with both WhatsApp and WhatsApp Business)
-      if ((data.status === 'awaiting_approval' || data.status === 'ready_for_pickup' || data.status === 'not_approved') && whatsappUrl) {
-        // Use setTimeout to ensure toast is shown first
-        setTimeout(() => {
-          // Detect if mobile device (PWA or mobile browser)
-          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          
-          if (isMobile) {
-            // On mobile (including PWA), use direct navigation - works better with WhatsApp/WhatsApp Business
-            window.location.href = whatsappUrl;
-          } else {
-            // On desktop, open in new tab
-            window.open(whatsappUrl, '_blank');
-          }
-        }, 1000);
-      }
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       toast({
