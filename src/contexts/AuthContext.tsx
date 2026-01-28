@@ -47,6 +47,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const processAuthRedirect = () => {
+    const url = new URL(window.location.href);
+    const hasAuthHash = url.hash.includes('access_token=');
+    const hasCode = url.searchParams.has('code');
+
+    if (!hasAuthHash && !hasCode) {
+      return Promise.resolve(false);
+    }
+
+    const authWithUrl = supabase.auth as typeof supabase.auth & {
+      getSessionFromUrl?: (options?: { storeSession?: boolean }) => Promise<{ error: unknown }>;
+    };
+    const clearUrl = () => {
+      if (url.hash || url.searchParams.has('code') || url.searchParams.has('next')) {
+        url.hash = '';
+        url.searchParams.delete('code');
+        url.searchParams.delete('next');
+        window.history.replaceState(null, document.title, `${url.pathname}${url.search}`);
+      }
+    };
+
+    if (typeof authWithUrl.getSessionFromUrl === 'function') {
+      return authWithUrl.getSessionFromUrl({ storeSession: true })
+        .then(({ error }) => {
+          if (error) {
+            console.warn('Auth redirect session failed:', error);
+          }
+          clearUrl();
+          return true;
+        })
+        .catch((error) => {
+          console.warn('Auth redirect session failed:', error);
+          clearUrl();
+          return true;
+        });
+    }
+
+    if (hasAuthHash) {
+      const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+
+      if (!accessToken || !refreshToken) {
+        clearUrl();
+        return Promise.resolve(false);
+      }
+
+      return supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ error }) => {
+          if (error) {
+            console.warn('Auth redirect session failed:', error);
+          }
+          clearUrl();
+          return true;
+        })
+        .catch((error) => {
+          console.warn('Auth redirect session failed:', error);
+          clearUrl();
+          return true;
+        });
+    }
+
+    const code = url.searchParams.get('code');
+    if (!code) {
+      clearUrl();
+      return Promise.resolve(false);
+    }
+
+    return supabase.auth.exchangeCodeForSession(code)
+      .then(({ error }) => {
+        if (error) {
+          console.warn('Auth redirect session failed:', error);
+        }
+        clearUrl();
+        return true;
+      })
+      .catch((error) => {
+        console.warn('Auth redirect session failed:', error);
+        clearUrl();
+        return true;
+      });
+  };
 
   const refreshProfile = async () => {
     if (!user) {
@@ -62,12 +144,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isAdminPath = window.location.pathname.startsWith('/admin');
 
     if (isAdminPath) {
+      let pendingReadySignals = 2;
+      const markReady = () => {
+        pendingReadySignals -= 1;
+        if (pendingReadySignals <= 0) {
+          setLoading(false);
+        }
+      };
+
+      processAuthRedirect().then(() => {
+        markReady();
+      });
       supabase.auth.getSession().then(({ data: { session } }) => {
         setUser(session?.user ?? null);
         if (session?.user) {
           getProfile(session.user.id).then(setProfile);
         }
-        setLoading(false);
+        markReady();
       });
       // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -83,13 +176,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let pendingReadySignals = 2;
-    let initialEventHandled = false;
     const markReady = () => {
       pendingReadySignals -= 1;
       if (pendingReadySignals <= 0) {
         setLoading(false);
       }
     };
+
+    processAuthRedirect().then(() => {
+      markReady();
+    });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -107,10 +203,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getProfile(session.user.id).then(setProfile);
       } else {
         setProfile(null);
-      }
-      if (!initialEventHandled) {
-        initialEventHandled = true;
-        markReady();
       }
     });
 
@@ -199,7 +291,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Usar canonical origin para evitar mistura de www/non-www
       const canonicalOrigin = window.location.origin;
-      const redirectTo = `${canonicalOrigin}/auth/callback?next=/client`;
+      const searchParams = new URLSearchParams(window.location.search);
+      const rawNext = searchParams.get('next');
+      const isSafeNext = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
+      const redirectTo = isSafeNext
+        ? `${canonicalOrigin}/auth/callback?next=${encodeURIComponent(rawNext)}`
+        : `${canonicalOrigin}/auth/callback`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
