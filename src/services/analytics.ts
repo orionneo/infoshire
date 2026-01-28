@@ -1,5 +1,27 @@
 import { supabase } from '@/db/supabase';
 
+type SupabaseErrorLike = {
+  code?: string;
+  status?: number;
+  message?: string;
+};
+
+function isErrorWithCode(error: unknown, code: string): boolean {
+  return typeof error === 'object' && error !== null && (error as SupabaseErrorLike).code === code;
+}
+
+function isConflictError(error: unknown): boolean {
+  if (isErrorWithCode(error, '23505')) {
+    return true;
+  }
+
+  return typeof error === 'object' && error !== null && (error as SupabaseErrorLike).status === 409;
+}
+
+function isForeignKeyError(error: unknown): boolean {
+  return isErrorWithCode(error, '23503');
+}
+
 // ============================================
 // VISITOR & SESSION MANAGEMENT
 // ============================================
@@ -169,7 +191,55 @@ export async function getGeolocation(): Promise<{ city: string | null; country: 
 
 let sessionStartTime: number | null = null;
 let lastActivityTime: number | null = null;
-let durationUpdateInterval: NodeJS.Timeout | null = null;
+let durationUpdateInterval: ReturnType<typeof setInterval> | null = null;
+
+async function buildSessionPayload(sessionId: string) {
+  const visitorId = getOrCreateVisitorId();
+  const deviceType = getDeviceType();
+  const browser = getBrowser();
+  const isBotUser = isBot();
+  const location = await getGeolocation().catch(() => ({ city: null, country: null }));
+
+  return {
+    session_id: sessionId,
+    visitor_id: visitorId,
+    first_visit: new Date().toISOString(),
+    last_activity: new Date().toISOString(),
+    page_count: 1,
+    duration_seconds: 0,
+    is_bot: isBotUser,
+    device_type: deviceType,
+    browser: browser,
+    city: location.city,
+    country: location.country,
+    referrer: document.referrer || null,
+    user_agent: navigator.userAgent,
+    page_entry: window.location.pathname,
+  };
+}
+
+async function ensureAnalyticsSession(sessionId: string): Promise<boolean> {
+  try {
+    const payload = await buildSessionPayload(sessionId);
+    const { error } = await supabase
+      .from('analytics_sessions')
+      .upsert(payload, { onConflict: 'session_id' });
+
+    if (error) {
+      if (isConflictError(error)) {
+        return true;
+      }
+
+      console.warn('[ANALYTICS] Erro ao garantir sessão:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn('[ANALYTICS] Erro ao garantir sessão:', error);
+    return false;
+  }
+}
 
 /**
  * Iniciar rastreamento de sessão
@@ -183,38 +253,11 @@ export async function trackSessionStart(): Promise<boolean> {
     }
 
     const sessionId = getSessionId();
-    const visitorId = getOrCreateVisitorId();
     const sourceType = detectTrafficSource();
     const utmParams = getUtmParams();
-    const deviceType = getDeviceType();
-    const browser = getBrowser();
-    const isBotUser = isBot();
+    const sessionEnsured = await ensureAnalyticsSession(sessionId);
 
-    // Obter geolocalização (cidade e país)
-    const location = await getGeolocation();
-
-    // Inserir sessão
-    const { error: sessionError } = await supabase
-      .from('analytics_sessions')
-      .insert({
-        session_id: sessionId,
-        visitor_id: visitorId,
-        first_visit: new Date().toISOString(),
-        last_activity: new Date().toISOString(),
-        page_count: 1,
-        duration_seconds: 0,
-        is_bot: isBotUser,
-        device_type: deviceType,
-        browser: browser,
-        city: location.city,
-        country: location.country,
-        referrer: document.referrer || null,
-        user_agent: navigator.userAgent,
-        page_entry: window.location.pathname,
-      });
-
-    if (sessionError) {
-      console.error('[ANALYTICS] Erro ao inserir sessão:', sessionError);
+    if (!sessionEnsured) {
       return false;
     }
 
@@ -231,7 +274,9 @@ export async function trackSessionStart(): Promise<boolean> {
       });
 
     if (sourceError) {
-      console.error('[ANALYTICS] Erro ao inserir origem:', sourceError);
+      if (!isConflictError(sourceError)) {
+        console.warn('[ANALYTICS] Erro ao inserir origem:', sourceError);
+      }
     }
 
     // Marcar sessão como iniciada
@@ -253,52 +298,37 @@ export async function trackSessionStart(): Promise<boolean> {
  * Iniciar heartbeat para atualizar duração da sessão
  */
 function startDurationHeartbeat() {
-  // Limpar interval anterior se existir
   if (durationUpdateInterval) {
     clearInterval(durationUpdateInterval);
+    durationUpdateInterval = null;
   }
 
-  // Atualizar duração a cada 5 segundos quando aba está visível
-  durationUpdateInterval = setInterval(() => {
-    if (document.visibilityState === 'visible') {
-      updateSessionDuration();
-    }
-  }, 5000);
-
-  // Atualizar ao sair da página
-  window.addEventListener('beforeunload', () => {
-    updateSessionDuration();
-  });
-
-  // Atualizar quando aba fica visível novamente
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      lastActivityTime = Date.now();
-    } else {
-      updateSessionDuration();
-    }
-  });
+  void updateSessionDuration();
 }
 
 /**
  * Atualizar duração da sessão
  */
 async function updateSessionDuration() {
-  if (!sessionStartTime || !lastActivityTime) return;
+  try {
+    if (!sessionStartTime || !lastActivityTime) return;
 
-  const sessionId = getSessionId();
-  const durationSeconds = Math.floor((Date.now() - sessionStartTime) / 1000);
+    const sessionId = getSessionId();
+    const durationSeconds = Math.floor((Date.now() - sessionStartTime) / 1000);
 
-  const { error } = await supabase
-    .from('analytics_sessions')
-    .update({
-      duration_seconds: durationSeconds,
-      last_activity: new Date().toISOString(),
-    })
-    .eq('session_id', sessionId);
+    const { error } = await supabase
+      .from('analytics_sessions')
+      .update({
+        duration_seconds: durationSeconds,
+        last_activity: new Date().toISOString(),
+      })
+      .eq('session_id', sessionId);
 
-  if (error) {
-    console.error('[ANALYTICS] Erro ao atualizar duração:', error);
+    if (error && !isConflictError(error)) {
+      console.warn('[ANALYTICS] Erro ao atualizar duração:', error);
+    }
+  } catch (error) {
+    console.warn('[ANALYTICS] Erro ao atualizar duração:', error);
   }
 }
 
@@ -322,18 +352,42 @@ export async function trackPageView(path: string, title: string): Promise<boolea
       return true; // Já rastreado
     }
 
-    const { error } = await supabase
-      .from('analytics_pageviews')
-      .insert({
-        session_id: sessionId,
-        visitor_id: visitorId,
-        page_path: path,
-        page_title: title,
-        time_on_page: 0,
-      });
+    await ensureAnalyticsSession(sessionId);
+
+    const insertPayload = {
+      session_id: sessionId,
+      visitor_id: visitorId,
+      page_path: path,
+      page_title: title,
+      time_on_page: 0,
+    };
+
+    const { error } = await supabase.from('analytics_pageviews').insert([insertPayload]);
 
     if (error) {
-      console.error('[ANALYTICS] Erro ao rastrear pageview:', error);
+      if (isConflictError(error)) {
+        trackedPages.add(pageKey);
+        return true;
+      }
+
+      if (isForeignKeyError(error)) {
+        const sessionEnsured = await ensureAnalyticsSession(sessionId);
+        if (sessionEnsured) {
+          const { error: retryError } = await supabase
+            .from('analytics_pageviews')
+            .insert([insertPayload]);
+
+          if (!retryError || isConflictError(retryError)) {
+            trackedPages.add(pageKey);
+            return true;
+          }
+
+          console.warn('[ANALYTICS] Erro ao rastrear pageview (retry):', retryError);
+          return false;
+        }
+      }
+
+      console.warn('[ANALYTICS] Erro ao rastrear pageview:', error);
       return false;
     }
 
@@ -345,12 +399,14 @@ export async function trackPageView(path: string, title: string): Promise<boolea
     });
 
     if (updateError) {
-      console.error('[ANALYTICS] Erro ao incrementar page_count:', updateError);
+      if (!isConflictError(updateError)) {
+        console.warn('[ANALYTICS] Erro ao incrementar page_count:', updateError);
+      }
     }
 
     return true;
   } catch (error) {
-    console.error('[ANALYTICS] Erro ao rastrear pageview:', error);
+    console.warn('[ANALYTICS] Erro ao rastrear pageview:', error);
     return false;
   }
 }
@@ -390,14 +446,16 @@ export async function trackEvent(
       });
 
     if (error) {
-      console.error('[ANALYTICS] Erro ao rastrear evento:', error);
+      if (!isConflictError(error)) {
+        console.warn('[ANALYTICS] Erro ao rastrear evento:', error);
+      }
       return false;
     }
 
     trackedEvents.add(eventKey);
     return true;
   } catch (error) {
-    console.error('[ANALYTICS] Erro ao rastrear evento:', error);
+    console.warn('[ANALYTICS] Erro ao rastrear evento:', error);
     return false;
   }
 }
