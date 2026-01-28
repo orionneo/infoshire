@@ -1,13 +1,18 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Redirecionando…</title>
+    <title>Redirecting…</title>
     <script>
-      const redirect = window.location.pathname + window.location.search + window.location.hash;
-      window.location.replace(`/?redirect=${encodeURIComponent(redirect)}`);
+      (function () {
+        var path = window.location.pathname + window.location.search + window.location.hash;
+        var target = "/?__redirect=" + encodeURIComponent(path);
+        window.location.replace(target);
+      })();
     </script>
   </head>
-  <body></body>
+  <body>
+    <p>Redirecting…</p>
+  </body>
 </html>

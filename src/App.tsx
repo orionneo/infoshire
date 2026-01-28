@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
+import { Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom';
 import IntersectObserver from '@/components/common/IntersectObserver';
 import { RouteGuard } from '@/components/common/RouteGuard';
 import { ScrollToTop } from '@/components/common/ScrollToTop';
@@ -12,39 +12,45 @@ import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import routes from './routes';
 
-const App: React.FC = () => {
-  return (
-    <Router>
-      <AuthProvider>
-        <StatePersistence>
-          <RouteGuard>
-            <ScrollToTop />
-            <IntersectObserver />
-            <AnalyticsTracker />
-            {/* Global Gamer Background - afeta TODAS as páginas */}
-            <GlobalGamerBackground />
-            <div className="flex flex-col min-h-screen relative z-10">
-              <main className="flex-grow">
-                <Routes>
-                  {routes.map((route, index) => (
-                    <Route
-                      key={index}
-                      path={route.path}
-                      element={route.element}
-                    />
-                  ))}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </main>
-            </div>
-            <PWAInstallPrompt />
-            <ConnectionStatus />
-            <Toaster />
-          </RouteGuard>
-        </StatePersistence>
-      </AuthProvider>
-    </Router>
+const AppShell: React.FC = () => {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
+  const appBody = (
+    <RouteGuard>
+      <ScrollToTop />
+      <IntersectObserver />
+      {!isAdminRoute && <AnalyticsTracker />}
+      {!isAdminRoute && <GlobalGamerBackground />}
+      <div className="flex flex-col min-h-screen relative z-10">
+        <main className="flex-grow">
+          <Routes>
+            {routes.map((route, index) => (
+              <Route
+                key={index}
+                path={route.path}
+                element={route.element}
+              />
+            ))}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </div>
+      <PWAInstallPrompt />
+      <ConnectionStatus />
+      <Toaster />
+    </RouteGuard>
   );
+
+  return isAdminRoute ? appBody : <StatePersistence>{appBody}</StatePersistence>;
 };
+
+const App: React.FC = () => (
+  <Router>
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
+  </Router>
+);
 
 export default App;
