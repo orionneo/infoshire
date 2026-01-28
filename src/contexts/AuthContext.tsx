@@ -47,6 +47,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const processAuthHash = () => {
+    if (!window.location.hash.includes('access_token=')) {
+      return Promise.resolve(false);
+    }
+
+    const authWithUrl = supabase.auth as typeof supabase.auth & {
+      getSessionFromUrl?: (options?: { storeSession?: boolean }) => Promise<{ error: unknown }>;
+    };
+    const clearHash = () => {
+      if (window.location.hash) {
+        window.history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
+      }
+    };
+
+    if (typeof authWithUrl.getSessionFromUrl === 'function') {
+      return authWithUrl.getSessionFromUrl({ storeSession: true })
+        .then(({ error }) => {
+          if (error) {
+            console.warn('Auth hash session failed:', error);
+          }
+          clearHash();
+          return true;
+        })
+        .catch((error) => {
+          console.warn('Auth hash session failed:', error);
+          clearHash();
+          return true;
+        });
+    }
+
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+
+    if (!accessToken || !refreshToken) {
+      clearHash();
+      return Promise.resolve(false);
+    }
+
+    return supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ error }) => {
+        if (error) {
+          console.warn('Auth hash session failed:', error);
+        }
+        clearHash();
+        return true;
+      })
+      .catch((error) => {
+        console.warn('Auth hash session failed:', error);
+        clearHash();
+        return true;
+      });
+  };
 
   const refreshProfile = async () => {
     if (!user) {
@@ -62,12 +115,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isAdminPath = window.location.pathname.startsWith('/admin');
 
     if (isAdminPath) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          getProfile(session.user.id).then(setProfile);
-        }
-        setLoading(false);
+      processAuthHash().then(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            getProfile(session.user.id).then(setProfile);
+          }
+          setLoading(false);
+        });
       });
       // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -83,13 +138,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let pendingReadySignals = 2;
-    let initialEventHandled = false;
     const markReady = () => {
       pendingReadySignals -= 1;
       if (pendingReadySignals <= 0) {
         setLoading(false);
       }
     };
+
+    processAuthHash().then(() => {
+      markReady();
+    });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -107,10 +165,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getProfile(session.user.id).then(setProfile);
       } else {
         setProfile(null);
-      }
-      if (!initialEventHandled) {
-        initialEventHandled = true;
-        markReady();
       }
     });
 
