@@ -47,13 +47,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const processAuthRedirect = () => {
+  const processAuthRedirect = async () => {
     const url = new URL(window.location.href);
     const hasAuthHash = url.hash.includes('access_token=');
     const hasCode = url.searchParams.has('code');
 
     if (!hasAuthHash && !hasCode) {
-      return Promise.resolve(false);
+      return false;
     }
 
     const authWithUrl = supabase.auth as typeof supabase.auth & {
@@ -70,18 +70,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     if (typeof authWithUrl.getSessionFromUrl === 'function') {
-      return authWithUrl
-        .getSessionFromUrl({ storeSession: true })
-        .then(({ error }) => {
-          if (error) console.warn('Auth redirect session failed:', error);
-          clearUrl();
-          return true;
-        })
-        .catch((error) => {
+      try {
+        const { error } = await authWithUrl.getSessionFromUrl({ storeSession: true });
+        if (error) {
           console.warn('Auth redirect session failed:', error);
-          clearUrl();
-          return true;
-        });
+          return false;
+        }
+        clearUrl();
+        return true;
+      } catch (error) {
+        console.warn('Auth redirect session failed:', error);
+        return false;
+      }
     }
 
     // Fallback manual (implicit flow hash tokens)
@@ -91,43 +91,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const refreshToken = hashParams.get('refresh_token');
 
       if (!accessToken || !refreshToken) {
-        clearUrl();
-        return Promise.resolve(false);
+        return false;
       }
 
-      return supabase.auth
-        .setSession({ access_token: accessToken, refresh_token: refreshToken })
-        .then(({ error }) => {
-          if (error) console.warn('Auth redirect session failed:', error);
-          clearUrl();
-          return true;
-        })
-        .catch((error) => {
+      try {
+        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        if (error) {
           console.warn('Auth redirect session failed:', error);
-          clearUrl();
-          return true;
-        });
+          return false;
+        }
+        clearUrl();
+        return true;
+      } catch (error) {
+        console.warn('Auth redirect session failed:', error);
+        return false;
+      }
     }
 
     // Fallback PKCE (code)
     const code = url.searchParams.get('code');
     if (!code) {
-      clearUrl();
-      return Promise.resolve(false);
+      return false;
     }
 
-    return supabase.auth
-      .exchangeCodeForSession(code)
-      .then(({ error }) => {
-        if (error) console.warn('Auth redirect session failed:', error);
-        clearUrl();
-        return true;
-      })
-      .catch((error) => {
+    try {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) {
         console.warn('Auth redirect session failed:', error);
-        clearUrl();
-        return true;
-      });
+        return false;
+      }
+      clearUrl();
+      return true;
+    } catch (error) {
+      console.warn('Auth redirect session failed:', error);
+      return false;
+    }
   };
 
   const refreshProfile = async () => {
@@ -140,25 +138,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    let pendingReadySignals = 2;
-    const markReady = () => {
-      pendingReadySignals -= 1;
-      if (pendingReadySignals <= 0) setLoading(false);
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        await processAuthRedirect();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          const profileData = await getProfile(session.user.id);
+          if (!isMounted) return;
+          setProfile(profileData);
+        } else {
+          setProfile(null);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
 
-    processAuthRedirect().then(() => {
-      markReady();
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        getProfile(session.user.id).then(setProfile);
-      } else {
-        setProfile(null);
-      }
-      markReady();
-    });
+    initializeAuth();
 
     // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -170,7 +170,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signInWithUsername = async (username: string, password: string) => {
