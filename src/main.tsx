@@ -9,18 +9,24 @@ const restoreRedirectFromQuery = () => {
   const redirectParam = url.searchParams.get("__redirect");
   if (!redirectParam) return;
 
-  let decodedPath = "/";
+  let target: URL | null = null;
   try {
-    decodedPath = decodeURIComponent(redirectParam);
+    target = new URL(redirectParam, window.location.origin);
   } catch {
-    decodedPath = "/";
+    target = null;
   }
 
-  const safePath =
-    decodedPath.startsWith("/") && !decodedPath.startsWith("//") ? decodedPath : "/";
+  if (!target) return;
 
-  // remove __redirect from query and restore path
-  window.history.replaceState({}, document.title, safePath);
+  url.searchParams.delete("__redirect");
+  for (const [key, value] of url.searchParams.entries()) {
+    if (!target.searchParams.has(key)) {
+      target.searchParams.set(key, value);
+    }
+  }
+
+  const finalUrl = `${target.pathname}${target.search}${url.hash || ""}`;
+  window.history.replaceState({}, document.title, finalUrl);
 };
 
 const redirectHashOAuthToCallback = () => {
