@@ -6,25 +6,39 @@ function safeNext(next: string | null) {
   return !!next && next.startsWith('/') && !next.startsWith('//') && !next.includes('http');
 }
 
-function findVerifierHint() {
-  try {
-    const keys = Object.keys(localStorage);
-    const suspects = keys.filter((key) => {
-      const normalizedKey = key.toLowerCase();
-      return (
-        normalizedKey.includes('code') ||
-        normalizedKey.includes('verifier') ||
-        normalizedKey.includes('supabase')
-      );
-    });
+function collectStorageHint(storage: Storage) {
+  const keys = Object.keys(storage);
+  const suspects = keys.filter((key) => {
+    const normalizedKey = key.toLowerCase();
+    return (
+      normalizedKey.includes('code') ||
+      normalizedKey.includes('verifier') ||
+      normalizedKey.includes('supabase')
+    );
+  });
 
-    return {
-      keysCount: keys.length,
-      suspectKeys: suspects.slice(0, 20),
-    };
+  return {
+    keysCount: keys.length,
+    suspectKeys: suspects.slice(0, 20),
+  };
+}
+
+function findVerifierHint() {
+  const hints: Record<string, unknown> = {};
+
+  try {
+    hints.localStorage = collectStorageHint(localStorage);
   } catch (error) {
-    return { error: String(error) };
+    hints.localStorage = { error: String(error) };
   }
+
+  try {
+    hints.sessionStorage = collectStorageHint(sessionStorage);
+  } catch (error) {
+    hints.sessionStorage = { error: String(error) };
+  }
+
+  return hints;
 }
 
 export default function AuthCallback() {
@@ -60,7 +74,10 @@ export default function AuthCallback() {
       });
 
       if (error || !data?.session) {
-        console.error('[AuthCallback] exchangeCodeForSession failed', error);
+        console.error('[AuthCallback] exchangeCodeForSession failed', {
+          message: error?.message ?? null,
+          error,
+        });
         setErrorMsg(error?.message ?? 'Falha ao criar sessão a partir do code.');
         return;
       }

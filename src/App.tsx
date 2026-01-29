@@ -15,12 +15,13 @@ import routes from './routes';
 const AppShell: React.FC = () => {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
+  const isAuthCallback = location.pathname === '/auth/callback';
 
   const appBody = (
-    <RouteGuard>
+      <RouteGuard>
       <ScrollToTop />
       <IntersectObserver />
-      {!isAdminRoute && <AnalyticsTracker />}
+      {!isAdminRoute && !isAuthCallback && <AnalyticsTracker />}
       {!isAdminRoute && <GlobalGamerBackground />}
       <div className="flex flex-col min-h-screen relative z-10">
         <main className="flex-grow">
