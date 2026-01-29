@@ -47,87 +47,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const processAuthRedirect = async () => {
-    const url = new URL(window.location.href);
-    const hasAuthHash = url.hash.includes('access_token=');
-    const hasCode = url.searchParams.has('code');
-
-    if (!hasAuthHash && !hasCode) {
-      return false;
-    }
-
-    const authWithUrl = supabase.auth as typeof supabase.auth & {
-      getSessionFromUrl?: (options?: { storeSession?: boolean }) => Promise<{ error: unknown }>;
-    };
-
-    const clearUrl = () => {
-      if (url.hash || url.searchParams.has('code') || url.searchParams.has('next')) {
-        url.hash = '';
-        url.searchParams.delete('code');
-        url.searchParams.delete('next');
-        window.history.replaceState(null, document.title, `${url.pathname}${url.search}`);
-      }
-    };
-
-    if (typeof authWithUrl.getSessionFromUrl === 'function') {
-      try {
-        const { error } = await authWithUrl.getSessionFromUrl({ storeSession: true });
-        if (error) {
-          console.warn('Auth redirect session failed:', error);
-          return false;
-        }
-        clearUrl();
-        return true;
-      } catch (error) {
-        console.warn('Auth redirect session failed:', error);
-        return false;
-      }
-    }
-
-    // Fallback manual (implicit flow hash tokens)
-    if (hasAuthHash) {
-      const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-
-      if (!accessToken || !refreshToken) {
-        return false;
-      }
-
-      try {
-        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-        if (error) {
-          console.warn('Auth redirect session failed:', error);
-          return false;
-        }
-        clearUrl();
-        return true;
-      } catch (error) {
-        console.warn('Auth redirect session failed:', error);
-        return false;
-      }
-    }
-
-    // Fallback PKCE (code)
-    const code = url.searchParams.get('code');
-    if (!code) {
-      return false;
-    }
-
-    try {
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) {
-        console.warn('Auth redirect session failed:', error);
-        return false;
-      }
-      clearUrl();
-      return true;
-    } catch (error) {
-      console.warn('Auth redirect session failed:', error);
-      return false;
-    }
-  };
-
   const refreshProfile = async () => {
     if (!user) {
       setProfile(null);
@@ -142,7 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initializeAuth = async () => {
       try {
-        await processAuthRedirect();
         const { data: { session } } = await supabase.auth.getSession();
         if (!isMounted) return;
         setUser(session?.user ?? null);
@@ -260,19 +178,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      const searchParams = new URLSearchParams(window.location.search);
-      const rawNext = searchParams.get('next');
-      const nextSafe = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
+      const current = new URL(window.location.href);
+      const rawNext = current.searchParams.get('next');
+      const safeNext =
+        rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
 
-      if (nextSafe) {
-        window.history.replaceState({}, '', `/auth/callback?next=${encodeURIComponent(rawNext)}`);
-      } else {
-        window.history.replaceState({}, '', '/auth/callback');
+      const redirectTo = new URL('/auth/callback', current.origin);
+      if (safeNext) {
+        redirectTo.searchParams.set('next', rawNext);
       }
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
+          redirectTo: redirectTo.toString(),
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

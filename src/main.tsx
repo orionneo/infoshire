@@ -4,56 +4,6 @@ import "./index.css";
 import App from "./App.tsx";
 import { AppWrapper } from "./components/common/PageMeta.tsx";
 
-const restoreRedirectFromQuery = () => {
-  const url = new URL(window.location.href);
-  const redirectParam = url.searchParams.get("__redirect");
-  if (!redirectParam) return;
-
-  let target: URL | null = null;
-  try {
-    target = new URL(redirectParam, window.location.origin);
-  } catch {
-    target = null;
-  }
-
-  if (!target) return;
-
-  const mergedParams = new URLSearchParams(target.search);
-  url.searchParams.delete("__redirect");
-  for (const [key, value] of url.searchParams.entries()) {
-    if (!mergedParams.has(key)) {
-      mergedParams.set(key, value);
-    }
-  }
-
-  target.search = mergedParams.toString() ? `?${mergedParams.toString()}` : "";
-
-  const finalUrl = `${target.pathname}${target.search}${url.hash || ""}`;
-  window.history.replaceState({}, document.title, finalUrl);
-};
-
-const redirectHashOAuthToCallback = () => {
-  const { hash, pathname } = window.location;
-  if (!hash || pathname === "/auth/callback") return;
-
-  const hasAuthHash =
-    hash.includes("access_token=") || hash.includes("refresh_token=");
-  if (!hasAuthHash) return;
-
-  const currentUrl = new URL(window.location.href);
-  const rawNext = currentUrl.searchParams.get("next");
-  const isSafeNext =
-    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.includes("http");
-
-  const redirectUrl = new URL("/auth/callback", currentUrl.origin);
-  if (isSafeNext) redirectUrl.searchParams.set("next", rawNext);
-
-  window.location.replace(`${redirectUrl.pathname}${redirectUrl.search}${hash}`);
-};
-
-restoreRedirectFromQuery();
-redirectHashOAuthToCallback();
-
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppWrapper>

@@ -39,6 +39,7 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
   useEffect(() => {
     if (loading) return;
+    if (location.pathname === '/auth/callback') return;
 
     const isPublic = matchPublicRoute(location.pathname, PUBLIC_ROUTES);
 
