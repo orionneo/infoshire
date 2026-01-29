@@ -18,12 +18,15 @@ const restoreRedirectFromQuery = () => {
 
   if (!target) return;
 
+  const mergedParams = new URLSearchParams(target.search);
   url.searchParams.delete("__redirect");
   for (const [key, value] of url.searchParams.entries()) {
-    if (!target.searchParams.has(key)) {
-      target.searchParams.set(key, value);
+    if (!mergedParams.has(key)) {
+      mergedParams.set(key, value);
     }
   }
+
+  target.search = mergedParams.toString() ? `?${mergedParams.toString()}` : "";
 
   const finalUrl = `${target.pathname}${target.search}${url.hash || ""}`;
   window.history.replaceState({}, document.title, finalUrl);
