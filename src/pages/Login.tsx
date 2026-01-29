@@ -1,30 +1,35 @@
 import { ArrowLeft, Loader2, Wrench } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/db/supabase';
+
+const isSafeNext = (next: string | null) => {
+  if (!next) return false;
+  return next.startsWith('/') && !next.startsWith('//') && !next.includes('http');
+};
 export default function Login() {
   const { user, profile, signInWithUsername, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   // Redireciona para a área do cliente se já estiver autenticado
   useEffect(() => {
-    if (user) {
-      if (profile?.role === 'admin') {
-        navigate('/admin', { replace: true });
-        return;
-      }
-      navigate('/client', { replace: true });
+    if (!user) return;
+    if (!profile) return;
+    if (profile.role === 'admin') {
+      navigate('/admin', { replace: true });
+      return;
     }
+    navigate('/client', { replace: true });
   }, [user, profile, navigate]);
 
   const form = useForm({
@@ -70,13 +75,25 @@ export default function Login() {
         return;
       }
 
-      // Redirecionar para a página anterior ou para o dashboard
-      if (profile?.role === 'admin') {
-        navigate('/admin', { replace: true });
-        return;
+      const url = new URL(window.location.href);
+      const next = url.searchParams.get('next');
+      const nextSafe = isSafeNext(next) ? next : null;
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+
+      let role: string | null = null;
+      if (userId) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+        role = profileData?.role ?? null;
       }
-      const from = (location.state as any)?.from || '/client';
-      navigate(from, { replace: true });
+
+      const destination = nextSafe ? nextSafe : role === 'admin' ? '/admin' : '/client';
+      navigate(destination, { replace: true });
     } catch (error) {
       toast({
         title: 'Erro',
