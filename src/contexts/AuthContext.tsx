@@ -260,17 +260,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      const base = 'https://infoshire.com.br';
       const searchParams = new URLSearchParams(window.location.search);
       const rawNext = searchParams.get('next');
       const nextSafe = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
-      const internalTarget = `/auth/callback${nextSafe ? `?next=${encodeURIComponent(rawNext)}` : ''}`;
-      const redirectTo = `${base}/?__redirect=${encodeURIComponent(internalTarget)}`;
+
+      if (nextSafe) {
+        window.history.replaceState({}, '', `/auth/callback?next=${encodeURIComponent(rawNext)}`);
+      } else {
+        window.history.replaceState({}, '', '/auth/callback');
+      }
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
