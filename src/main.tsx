@@ -16,27 +16,37 @@ function isSafeRedirectPath(target: string) {
 
 function restoreRedirect() {
   const currentUrl = new URL(window.location.href);
-  const redirect = currentUrl.searchParams.get("__redirect");
+  const params = currentUrl.searchParams;
+  const pathParam = params.get("p");
+  const queryParam = params.get("q");
+  const hashParam = params.get("h");
+
+  if (pathParam) {
+    const targetPath = pathParam;
+    if (!isSafeRedirectPath(targetPath)) {
+      return;
+    }
+    const targetSearch = queryParam ? `?${queryParam}` : "";
+    const targetHash = hashParam ? `#${hashParam}` : "";
+    const target = `${targetPath}${targetSearch}${targetHash}`;
+
+    window.history.replaceState({}, "", target);
+    console.log("[bootstrap] restored redirect", { source: "p", target });
+    return;
+  }
+
+  const redirect = params.get("__redirect");
 
   if (!redirect || !isSafeRedirectPath(redirect)) {
     return;
   }
 
-  currentUrl.searchParams.delete("__redirect");
-
-  const redirectUrl = new URL(redirect, window.location.origin);
-  const mergedParams = new URLSearchParams(redirectUrl.searchParams);
-
-  for (const [key, value] of currentUrl.searchParams.entries()) {
-    mergedParams.append(key, value);
-  }
-
-  const mergedSearch = mergedParams.toString();
-  const target = `${redirectUrl.pathname}${
-    mergedSearch ? `?${mergedSearch}` : ""
-  }${redirectUrl.hash}`;
-
-  window.history.replaceState({}, "", target);
+  window.history.replaceState({}, "", redirect);
+  console.log("[bootstrap] restored redirect", {
+    source: "__redirect",
+    target: redirect,
+  });
+  return;
 }
 
 restoreRedirect();
