@@ -260,14 +260,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      // Use canonical origin to avoid mixing www/non-www
-      const canonicalOrigin = 'https://infoshire.com.br';
+      const base = 'https://infoshire.com.br';
       const searchParams = new URLSearchParams(window.location.search);
       const rawNext = searchParams.get('next');
-      const isSafeNext = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
-      const redirectTo = isSafeNext
-        ? `${canonicalOrigin}/auth/callback?next=${encodeURIComponent(rawNext)}`
-        : `${canonicalOrigin}/auth/callback`;
+      const nextSafe = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('http');
+      const internalTarget = `/auth/callback${nextSafe ? `?next=${encodeURIComponent(rawNext)}` : ''}`;
+      const redirectTo = `${base}/?__redirect=${encodeURIComponent(internalTarget)}`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
