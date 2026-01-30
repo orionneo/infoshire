@@ -24,6 +24,12 @@ function getVerifierDetails(storage: Storage, keys: string[]) {
   }
 }
 
+function parseQueryString(raw: string | null) {
+  if (!raw) return new URLSearchParams();
+  const trimmed = raw.startsWith('?') ? raw.slice(1) : raw;
+  return new URLSearchParams(trimmed);
+}
+
 export default function AuthCallback() {
   const ran = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -37,8 +43,20 @@ export default function AuthCallback() {
     const run = async () => {
       const url = new URL(window.location.href);
       const pkceDebug = url.searchParams.get('pkce_debug') === '1';
+      const p = url.searchParams.get('p');
+      const q = url.searchParams.get('q');
+      const effectivePath = url.pathname === '/' && p && p.startsWith('/') ? p : url.pathname;
+      const qParams = parseQueryString(q);
       if (pkceDebug) {
-        console.log('[AuthCallback] mounted', { href: location.href });
+        console.log('[AuthCallback] pkce_debug fallback', {
+          href: location.href,
+          pathname: url.pathname,
+          search: url.search,
+          p,
+          q,
+          effectivePath,
+          codePresent: Boolean(url.searchParams.get('code') || qParams.get('code')),
+        });
       }
       const code = url.searchParams.get('code');
       const next = url.searchParams.get('next');

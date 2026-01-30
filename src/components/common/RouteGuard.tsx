@@ -32,6 +32,12 @@ function matchPublicRoute(path: string, patterns: string[]) {
   });
 }
 
+function parseQueryString(raw: string | null) {
+  if (!raw) return new URLSearchParams();
+  const trimmed = raw.startsWith('?') ? raw.slice(1) : raw;
+  return new URLSearchParams(trimmed);
+}
+
 function getEffectivePathname(locationPathname: string) {
   try {
     const url = new URL(window.location.href);
@@ -39,6 +45,21 @@ function getEffectivePathname(locationPathname: string) {
     if (locationPathname === '/' && p && p.startsWith('/')) return p;
   } catch {}
   return locationPathname;
+}
+
+function getPkceCallbackInfo(locationPathname: string) {
+  try {
+    const url = new URL(window.location.href);
+    const p = url.searchParams.get('p');
+    const q = url.searchParams.get('q');
+    const effectivePath = locationPathname === '/' && p && p.startsWith('/') ? p : locationPathname;
+    const directParams = url.searchParams;
+    const qParams = parseQueryString(q);
+    const code = directParams.get('code') || qParams.get('code');
+    return { effectivePath, codePresent: Boolean(code), p, q };
+  } catch {
+    return { effectivePath: locationPathname, codePresent: false, p: null, q: null };
+  }
 }
 
 export function RouteGuard({ children }: RouteGuardProps) {
@@ -49,19 +70,14 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
   useEffect(() => {
     if (loading) return;
-    const effectivePath = getEffectivePathname(location.pathname);
-    if (effectivePath === '/auth/callback') {
-      return;
-    }
-
-    const isPublic = matchPublicRoute(effectivePath, PUBLIC_ROUTES);
+    const { effectivePath, codePresent, p: pParam, q: qParam } = getPkceCallbackInfo(location.pathname);
+    const isAuthCallback = effectivePath === '/auth/callback' || codePresent;
+    const isPublic = isAuthCallback || matchPublicRoute(effectivePath, PUBLIC_ROUTES);
 
     let pkceDebug = false;
-    let pParam: string | null = null;
     try {
       const url = new URL(window.location.href);
       pkceDebug = url.searchParams.get('pkce_debug') === '1';
-      pParam = url.searchParams.get('p');
     } catch {}
     if (pkceDebug && !hasLoggedPkceDebug.current) {
       hasLoggedPkceDebug.current = true;
@@ -69,11 +85,24 @@ export function RouteGuard({ children }: RouteGuardProps) {
         pathname: location.pathname,
         search: location.search,
         p: pParam,
+        q: qParam,
         effectivePath,
         isPublic,
+        isAuthCallback,
+        codePresent,
         userId: user?.id,
         loading,
       });
+    }
+
+    if (pkceDebug) {
+      const decision = !user && !isPublic ? 'redirect_login' : 'allow';
+      const rule = isAuthCallback
+        ? 'oauth_callback'
+        : !user && !isPublic
+          ? 'requires_auth'
+          : 'default';
+      console.log('[RouteGuard] pkce_debug decision', { decision, rule });
     }
 
     if (!user && !isPublic) {
