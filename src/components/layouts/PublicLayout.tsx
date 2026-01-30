@@ -421,7 +421,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               >
                 <p className="text-[10px] font-semibold text-muted-foreground/90">Parceiro Oficial</p>
                 <img 
-                  src="{logoIcon}"
+                  src={logoIcon}
                   alt="Global Electronics"
                   className="h-6 w-auto object-contain"
                 />
@@ -636,7 +636,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                   className="flex items-center gap-3 bg-black px-6 py-3 rounded-lg border border-primary/30 hover:border-primary transition-all duration-300 hover:scale-105 group"
                 >
                   <img 
-                    src="{logoIcon}"
+                    src={logoIcon}
                     alt="Global Electronics - Distribuidor Autorizado"
                     className="h-8 sm:h-10 w-auto object-contain"
                   />
