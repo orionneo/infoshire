@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -32,33 +32,64 @@ function matchPublicRoute(path: string, patterns: string[]) {
   });
 }
 
+function getEffectivePathname(locationPathname: string) {
+  try {
+    const url = new URL(window.location.href);
+    const p = url.searchParams.get('p'); // GH Pages restore param
+    if (locationPathname === '/' && p && p.startsWith('/')) return p;
+  } catch {}
+  return locationPathname;
+}
+
 export function RouteGuard({ children }: RouteGuardProps) {
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const hasLoggedPkceDebug = useRef(false);
 
   useEffect(() => {
     if (loading) return;
-    if (location.pathname === '/auth/callback') {
+    const effectivePath = getEffectivePathname(location.pathname);
+    if (effectivePath === '/auth/callback') {
       return;
     }
 
-    const isPublic = matchPublicRoute(location.pathname, PUBLIC_ROUTES);
+    const isPublic = matchPublicRoute(effectivePath, PUBLIC_ROUTES);
+
+    let pkceDebug = false;
+    let pParam: string | null = null;
+    try {
+      const url = new URL(window.location.href);
+      pkceDebug = url.searchParams.get('pkce_debug') === '1';
+      pParam = url.searchParams.get('p');
+    } catch {}
+    if (pkceDebug && !hasLoggedPkceDebug.current) {
+      hasLoggedPkceDebug.current = true;
+      console.log('[RouteGuard] pkce_debug', {
+        pathname: location.pathname,
+        search: location.search,
+        p: pParam,
+        effectivePath,
+        isPublic,
+        userId: user?.id,
+        loading,
+      });
+    }
 
     if (!user && !isPublic) {
-      navigate('/login', { state: { from: location.pathname }, replace: true });
+      navigate('/login', { state: { from: effectivePath }, replace: true });
       return;
     }
 
-    const isAdminRoute = location.pathname.startsWith('/admin');
+    const isAdminRoute = effectivePath.startsWith('/admin');
     if (user && profile && !isAdminRoute && profile.role !== 'admin') {
-      const isClientRoute = location.pathname.startsWith('/client');
-      const isCompleteProfileRoute = location.pathname === '/complete-profile';
+      const isClientRoute = effectivePath.startsWith('/client');
+      const isCompleteProfileRoute = effectivePath === '/complete-profile';
       if (isClientRoute && !profile.phone && !isCompleteProfileRoute) {
         navigate('/complete-profile', { replace: true });
       }
     }
-  }, [user, profile, loading, location.pathname, navigate]);
+  }, [user, profile, loading, location.pathname, location.search, navigate]);
 
   if (loading) {
     return (

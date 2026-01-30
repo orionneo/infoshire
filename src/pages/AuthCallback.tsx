@@ -36,9 +36,12 @@ export default function AuthCallback() {
 
     const run = async () => {
       const url = new URL(window.location.href);
+      const pkceDebug = url.searchParams.get('pkce_debug') === '1';
+      if (pkceDebug) {
+        console.log('[AuthCallback] mounted', { href: location.href });
+      }
       const code = url.searchParams.get('code');
       const next = url.searchParams.get('next');
-      const pkceDebug = url.searchParams.get('pkce_debug') === '1';
 
       if (pkceDebug) {
         console.log('[PKCE] pathname', window.location.pathname);
