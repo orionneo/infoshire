@@ -116,11 +116,13 @@ export default function BudgetApproval() {
             totalCost: order.total_cost,
             laborCost: order.labor_cost,
             partsCost: order.parts_cost,
+            notificationType: 'approved',
           },
         });
 
         if (telegramError) {
-          console.error('Erro ao enviar notificação do Telegram:', telegramError);
+          const errorMsg = await telegramError?.context?.text?.();
+          console.error('Erro ao enviar notificação do Telegram:', errorMsg || telegramError?.message || telegramError);
           // Don't throw error, just log it - approval was successful
         }
       } catch (telegramErr) {
