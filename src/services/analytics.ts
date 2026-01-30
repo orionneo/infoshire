@@ -10,6 +10,24 @@ const WARN_THROTTLE_MS = 60_000;
 const warnOnceByKey = new Map<string, number>();
 let analyticsDisabled = false;
 
+async function ensureAuthSessionReady(): Promise<boolean> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      console.log('[ANALYTICS] skipped: no session');
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    safeWarnOnce('Erro ao validar sessão auth', error);
+    return false;
+  }
+}
+
 function isErrorWithCode(error: unknown, code: string): boolean {
   return typeof error === 'object' && error !== null && (error as SupabaseErrorLike).code === code;
 }
@@ -294,6 +312,10 @@ async function ensureAnalyticsSession(sessionId: string): Promise<boolean> {
     return false;
   }
 
+  if (!(await ensureAuthSessionReady())) {
+    return false;
+  }
+
   try {
     const payload = await buildSessionPayload(sessionId);
     const { error } = await supabase
@@ -329,6 +351,10 @@ async function ensureAnalyticsSession(sessionId: string): Promise<boolean> {
  */
 export async function trackSessionStart(): Promise<boolean> {
   if (analyticsDisabled) {
+    return false;
+  }
+
+  if (!(await ensureAuthSessionReady())) {
     return false;
   }
 
@@ -411,6 +437,10 @@ async function updateSessionDuration() {
     return;
   }
 
+  if (!(await ensureAuthSessionReady())) {
+    return;
+  }
+
   try {
     if (!sessionStartTime || !lastActivityTime) return;
 
@@ -452,6 +482,10 @@ const trackedPages = new Set<string>();
  */
 export async function trackPageView(path: string, title: string): Promise<boolean> {
   if (analyticsDisabled) {
+    return false;
+  }
+
+  if (!(await ensureAuthSessionReady())) {
     return false;
   }
 
@@ -556,6 +590,10 @@ export async function trackEvent(
   pagePath?: string
 ): Promise<boolean> {
   if (analyticsDisabled) {
+    return false;
+  }
+
+  if (!(await ensureAuthSessionReady())) {
     return false;
   }
 

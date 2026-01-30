@@ -11,6 +11,7 @@ const PageMeta = ({
   <Helmet>
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="mobile-web-app-capable" content="yes" />
   </Helmet>
 );
 
