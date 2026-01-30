@@ -14,6 +14,24 @@ const isSafeNext = (next: string | null) => {
   if (!next) return false;
   return next.startsWith('/') && !next.startsWith('//') && !next.includes('http');
 };
+
+const PKCE_DEBUG = new URL(window.location.href).searchParams.get('pkce_debug') === '1';
+
+function storagePreflight() {
+  try {
+    const k = `__pkce_probe_${Date.now()}`;
+    localStorage.setItem(k, '1');
+    const ok = localStorage.getItem(k) === '1';
+    localStorage.removeItem(k);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function getPkceStorageKeys() {
+  return Object.keys(localStorage).filter((key) => /supabase|code|pkce|verifier/i.test(key));
+}
 export default function Login() {
   const { user, profile, signInWithUsername } = useAuth();
   const navigate = useNavigate();
@@ -108,17 +126,32 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
-      const url = new URL(window.location.href);
-      const next = url.searchParams.get('next');
-      const nextSafe = isSafeNext(next) && next ? next : '/client';
+      const preflightOk = storagePreflight();
+      if (PKCE_DEBUG) {
+        console.log('[PKCE] storage preflight', preflightOk);
+        console.log('[PKCE] href', window.location.href);
+        console.log('[PKCE] localStorage keys', getPkceStorageKeys());
+      }
 
-      const redirectTo =
-        `https://kcopdesulqlywjhueydb.supabase.co/functions/v1/oauth-callback?next=${encodeURIComponent(nextSafe)}`;
+      if (!preflightOk) {
+        toast({
+          title: 'Storage bloqueado; PKCE não vai funcionar neste navegador.',
+          variant: 'destructive',
+        });
+        setGoogleLoading(false);
+        return;
+      }
+
+      const redirectTo = 'https://infoshire.com.br/auth/callback';
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo },
       });
+
+      if (PKCE_DEBUG) {
+        console.log('[PKCE] localStorage keys', getPkceStorageKeys());
+      }
 
       if (error) {
         toast({
