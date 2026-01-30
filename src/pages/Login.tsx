@@ -17,20 +17,24 @@ const isSafeNext = (next: string | null) => {
 
 const PKCE_DEBUG = new URL(window.location.href).searchParams.get('pkce_debug') === '1';
 
-function storagePreflight() {
+function storagePreflight(storage: Storage) {
   try {
     const k = `__pkce_probe_${Date.now()}`;
-    localStorage.setItem(k, '1');
-    const ok = localStorage.getItem(k) === '1';
-    localStorage.removeItem(k);
+    storage.setItem(k, '1');
+    const ok = storage.getItem(k) === '1';
+    storage.removeItem(k);
     return ok;
   } catch {
     return false;
   }
 }
 
-function getPkceStorageKeys() {
-  return Object.keys(localStorage).filter((key) => /supabase|code|pkce|verifier/i.test(key));
+function getPkceStorageKeys(storage: Storage) {
+  try {
+    return Object.keys(storage).filter((key) => /supabase|code|pkce|verifier/i.test(key));
+  } catch {
+    return [];
+  }
 }
 export default function Login() {
   const { user, profile, signInWithUsername } = useAuth();
@@ -126,31 +130,49 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
-      const preflightOk = storagePreflight();
       if (PKCE_DEBUG) {
-        console.log('[PKCE] storage preflight', preflightOk);
+        const localOk = storagePreflight(localStorage);
+        const sessionOk = storagePreflight(sessionStorage);
+        console.log('[PKCE] storage preflight localStorage', localOk);
+        console.log('[PKCE] storage preflight sessionStorage', sessionOk);
         console.log('[PKCE] href', window.location.href);
-        console.log('[PKCE] localStorage keys', getPkceStorageKeys());
+        console.log('[PKCE] localStorage keys', getPkceStorageKeys(localStorage));
+        console.log('[PKCE] sessionStorage keys', getPkceStorageKeys(sessionStorage));
+        if (!localOk) {
+          toast({
+            title: 'Storage bloqueado; PKCE não vai funcionar neste navegador.',
+            variant: 'destructive',
+          });
+          setGoogleLoading(false);
+          return;
+        }
       }
 
-      if (!preflightOk) {
-        toast({
-          title: 'Storage bloqueado; PKCE não vai funcionar neste navegador.',
-          variant: 'destructive',
-        });
-        setGoogleLoading(false);
-        return;
+      const url = new URL(window.location.href);
+      const next = url.searchParams.get('next');
+      const nextSafe = isSafeNext(next) ? next : null;
+      const redirectParams = new URLSearchParams();
+      if (nextSafe) {
+        redirectParams.set('next', nextSafe);
       }
-
-      const redirectTo = 'https://infoshire.com.br/auth/callback';
+      if (PKCE_DEBUG) {
+        redirectParams.set('pkce_debug', '1');
+      }
+      const redirectTo = `${window.location.origin}/auth/callback${
+        redirectParams.toString() ? `?${redirectParams.toString()}` : ''
+      }`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo },
+        options: {
+          redirectTo,
+          queryParams: { prompt: 'select_account' },
+        },
       });
 
       if (PKCE_DEBUG) {
-        console.log('[PKCE] localStorage keys', getPkceStorageKeys());
+        console.log('[PKCE] localStorage keys', getPkceStorageKeys(localStorage));
+        console.log('[PKCE] sessionStorage keys', getPkceStorageKeys(sessionStorage));
       }
 
       if (error) {

@@ -5,19 +5,19 @@ function safeNext(next: string | null) {
   return !!next && next.startsWith('/') && !next.startsWith('//') && !next.includes('http');
 }
 
-function getPkceKeys() {
+function getPkceKeys(storage: Storage) {
   try {
-    return Object.keys(localStorage).filter((key) => /supabase|code|pkce|verifier/i.test(key));
+    return Object.keys(storage).filter((key) => /supabase|code|pkce|verifier/i.test(key));
   } catch {
     return [];
   }
 }
 
-function getVerifierDetails(keys: string[]) {
+function getVerifierDetails(storage: Storage, keys: string[]) {
   try {
-    const explicit = localStorage.getItem('supabase.auth.code_verifier');
+    const explicit = storage.getItem('supabase.auth.code_verifier');
     const detectedKey = keys.find((key) => key.toLowerCase().includes('code-verifier')) ?? null;
-    const detectedValue = detectedKey ? localStorage.getItem(detectedKey) : null;
+    const detectedValue = detectedKey ? storage.getItem(detectedKey) : null;
     return { explicit, detectedKey, detectedValue };
   } catch (error) {
     return { explicit: null, detectedKey: null, detectedValue: String(error) };
@@ -41,14 +41,22 @@ export default function AuthCallback() {
       const pkceDebug = url.searchParams.get('pkce_debug') === '1';
 
       if (pkceDebug) {
+        console.log('[PKCE] pathname', window.location.pathname);
+        console.log('[PKCE] search', window.location.search);
         console.log('[PKCE] href', window.location.href);
         console.log('[PKCE] code present', Boolean(code));
-        const keys = getPkceKeys();
-        console.log('[PKCE] localStorage keys', keys);
-        const verifierDetails = getVerifierDetails(keys);
-        console.log('[PKCE] verifier explicit', verifierDetails.explicit);
-        console.log('[PKCE] verifier detected key', verifierDetails.detectedKey);
-        console.log('[PKCE] verifier detected value', verifierDetails.detectedValue);
+        const localKeys = getPkceKeys(localStorage);
+        const sessionKeys = getPkceKeys(sessionStorage);
+        console.log('[PKCE] localStorage keys', localKeys);
+        console.log('[PKCE] sessionStorage keys', sessionKeys);
+        const localVerifier = getVerifierDetails(localStorage, localKeys);
+        const sessionVerifier = getVerifierDetails(sessionStorage, sessionKeys);
+        console.log('[PKCE] localStorage verifier explicit', localVerifier.explicit);
+        console.log('[PKCE] localStorage verifier detected key', localVerifier.detectedKey);
+        console.log('[PKCE] localStorage verifier detected value', localVerifier.detectedValue);
+        console.log('[PKCE] sessionStorage verifier explicit', sessionVerifier.explicit);
+        console.log('[PKCE] sessionStorage verifier detected key', sessionVerifier.detectedKey);
+        console.log('[PKCE] sessionStorage verifier detected value', sessionVerifier.detectedValue);
       }
 
       if (!code) {
@@ -60,9 +68,7 @@ export default function AuthCallback() {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         if (pkceDebug) {
           console.log('[PKCE] exchange result', data);
-          if (error) {
-            console.log('[PKCE] exchange error', error);
-          }
+          console.log('[PKCE] exchange error', error);
         }
 
         if (error) {

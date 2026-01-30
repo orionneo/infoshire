@@ -9,24 +9,32 @@ const memory = new Map<string, string>();
 const storage = {
   getItem: (key: string) => {
     try {
+      return localStorage.getItem(key);
+    } catch {}
+    try {
       return sessionStorage.getItem(key);
-    } catch {
-      return memory.get(key) ?? null;
-    }
+    } catch {}
+    return memory.get(key) ?? null;
   },
   setItem: (key: string, value: string) => {
     try {
+      localStorage.setItem(key, value);
+      return;
+    } catch {}
+    try {
       sessionStorage.setItem(key, value);
-    } catch {
-      memory.set(key, value);
-    }
+      return;
+    } catch {}
+    memory.set(key, value);
   },
   removeItem: (key: string) => {
     try {
+      localStorage.removeItem(key);
+    } catch {}
+    try {
       sessionStorage.removeItem(key);
-    } catch {
-      memory.delete(key);
-    }
+    } catch {}
+    memory.delete(key);
   },
 };
 
