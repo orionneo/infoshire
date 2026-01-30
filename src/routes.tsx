@@ -35,6 +35,7 @@ import ResetPassword from './pages/ResetPassword';
 import Services from './pages/Services';
 import TrackOrder from './pages/TrackOrder';
 import AuthCallback from './pages/AuthCallback';
+import AuthCallbackTokens from './pages/AuthCallbackTokens';
 
 interface RouteConfig {
   name: string;
@@ -109,6 +110,12 @@ const routes: RouteConfig[] = [
     name: 'AuthCallback',
     path: '/auth/callback',
     element: <AuthCallback />,
+    visible: false,
+  },
+  {
+    name: 'AuthCallbackTokens',
+    path: '/auth/callback-tokens',
+    element: <AuthCallbackTokens />,
     visible: false,
   },
   {

@@ -20,6 +20,7 @@ const PUBLIC_ROUTES = [
   '/contact',
   '/init-admin',
   '/auth/callback',
+  '/auth/callback-tokens',
 ];
 
 function matchPublicRoute(path: string, patterns: string[]) {
@@ -39,7 +40,9 @@ export function RouteGuard({ children }: RouteGuardProps) {
 
   useEffect(() => {
     if (loading) return;
-    if (location.pathname === '/auth/callback') return;
+    if (location.pathname === '/auth/callback' || location.pathname === '/auth/callback-tokens') {
+      return;
+    }
 
     const isPublic = matchPublicRoute(location.pathname, PUBLIC_ROUTES);
 

@@ -15,7 +15,7 @@ const isSafeNext = (next: string | null) => {
   return next.startsWith('/') && !next.startsWith('//') && !next.includes('http');
 };
 export default function Login() {
-  const { user, profile, signInWithUsername, signInWithGoogle } = useAuth();
+  const { user, profile, signInWithUsername } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -108,8 +108,18 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
-      const { error } = await signInWithGoogle();
-      
+      const url = new URL(window.location.href);
+      const next = url.searchParams.get('next');
+      const nextSafe = isSafeNext(next) && next ? next : '/client';
+
+      const redirectTo =
+        `https://kcopdesulqlywjhueydb.supabase.co/functions/v1/oauth-callback?next=${encodeURIComponent(nextSafe)}`;
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
+      });
+
       if (error) {
         toast({
           title: 'Erro ao entrar com Google',
