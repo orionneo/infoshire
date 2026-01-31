@@ -1049,15 +1049,32 @@ export async function sendEmailCampaign(data: {
   subject: string;
   body: string;
   recipientIds: string[];
+  imageUrl?: string;
 }): Promise<void> {
   const { error } = await supabase.functions.invoke('send-email-campaign', {
     body: JSON.stringify(data),
   });
 
   if (error) {
-    const errorMsg = await error?.context?.text();
+    const errorMsg = await resolveFunctionErrorMessage(error);
+    if (/fetch failed|failed to fetch|networkerror/i.test(errorMsg)) {
+      throw new Error(
+        'Falha de rede/CORS ao chamar send-email-campaign. Verifique CORS da Edge Function.'
+      );
+    }
     throw new Error(errorMsg || error.message || 'Erro ao enviar campanha de email');
   }
+}
+
+async function resolveFunctionErrorMessage(error: any): Promise<string> {
+  if (typeof error?.context?.text === 'function') {
+    return await error.context.text();
+  }
+  if (typeof error?.context?.json === 'function') {
+    const json = await error.context.json();
+    return typeof json === 'string' ? json : JSON.stringify(json);
+  }
+  return error?.message ? String(error.message) : String(error);
 }
 
 export async function getEmailCampaigns(): Promise<EmailCampaignWithSender[]> {
