@@ -26,6 +26,7 @@ export default function AdminEmailMarketing() {
   // Form state
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
 
@@ -73,10 +74,20 @@ export default function AdminEmailMarketing() {
   };
 
   const handleSendCampaign = async () => {
+    const trimmedImageUrl = imageUrl.trim();
     if (!subject.trim()) {
       toast({
         title: 'Erro',
         description: 'Por favor, preencha o assunto do email',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (trimmedImageUrl && !/^https?:\/\//i.test(trimmedImageUrl)) {
+      toast({
+        title: 'Erro',
+        description: 'A imagem promocional deve começar com http:// ou https://',
         variant: 'destructive',
       });
       return;
@@ -106,6 +117,7 @@ export default function AdminEmailMarketing() {
         subject,
         body,
         recipientIds: selectedClients,
+        imageUrl: trimmedImageUrl || undefined,
       });
 
       toast({
@@ -116,6 +128,7 @@ export default function AdminEmailMarketing() {
       // Reset form
       setSubject('');
       setBody('');
+      setImageUrl('');
       setSelectedClients([]);
       setSelectAll(false);
 
@@ -219,6 +232,19 @@ export default function AdminEmailMarketing() {
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="image-url">Imagem promocional (URL)</Label>
+                      <Input
+                        id="image-url"
+                        placeholder="https://exemplo.com/banner.png"
+                        value={imageUrl}
+                        onChange={(e) => setImageUrl(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Opcional. A imagem deve estar hospedada em um link público.
+                      </p>
                     </div>
 
                     <div className="space-y-2">

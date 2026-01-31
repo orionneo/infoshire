@@ -4,10 +4,18 @@ import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 // Helper function to send email via Resend
-async function sendViaResend(apiKey: string, from: string, to: string, subject: string, html: string) {
+async function sendViaResend(
+  apiKey: string,
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+  text: string
+) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -19,6 +27,7 @@ async function sendViaResend(apiKey: string, from: string, to: string, subject: 
       to: [to],
       subject,
       html,
+      text,
     }),
   });
 
@@ -33,11 +42,11 @@ async function sendViaResend(apiKey: string, from: string, to: string, subject: 
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { status: 200, headers: corsHeaders });
   }
 
   try {
-    const { subject, body, recipientIds } = await req.json();
+    const { subject, body, recipientIds, imageUrl } = await req.json();
 
     if (!subject || !body || !recipientIds || recipientIds.length === 0) {
       return new Response(
@@ -164,11 +173,22 @@ Deno.serve(async (req) => {
         if (!recipient.email) return null;
 
         try {
+          const promoImage = imageUrl
+            ? `
+              <img
+                src="${imageUrl}"
+                alt="Imagem promocional"
+                style="max-width: 100%; height: auto; border-radius: 6px; margin-bottom: 20px;"
+              />
+            `
+            : '';
+          const htmlBody = body.replace(/\n/g, '<br>');
           const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              ${promoImage}
               <h2 style="color: #333;">Olá ${recipient.name || 'Cliente'},</h2>
               <div style="margin: 20px 0; line-height: 1.6;">
-                ${body.replace(/\n/g, '<br>')}
+                ${htmlBody}
               </div>
               <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
               <p style="color: #666; font-size: 12px;">
@@ -176,8 +196,11 @@ Deno.serve(async (req) => {
               </p>
             </div>
           `;
+          const text = imageUrl
+            ? `Imagem promocional: ${imageUrl}\n\n${body}`
+            : body;
 
-          await sendViaResend(resendApiKey, from, recipient.email, subject, html);
+          await sendViaResend(resendApiKey, from, recipient.email, subject, html, text);
           return { email: recipient.email, success: true };
         } catch (error) {
           console.error(`Error sending email to ${recipient.email}:`, error);
@@ -231,16 +254,31 @@ Deno.serve(async (req) => {
         if (!recipient.email) return null;
 
         try {
+          const promoImage = imageUrl
+            ? `
+              <img
+                src="${imageUrl}"
+                alt="Imagem promocional"
+                style="max-width: 100%; height: auto; border-radius: 6px; margin-bottom: 20px;"
+              />
+            `
+            : '';
+          const htmlBody = body.replace(/\n/g, '<br>');
+          const text = imageUrl
+            ? `Imagem promocional: ${imageUrl}\n\n${body}`
+            : body;
           await client.send({
             from: `${emailConfig.from_name} <${emailConfig.from_email}>`,
             to: recipient.email,
             subject: subject,
             content: 'auto',
+            text,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                ${promoImage}
                 <h2 style="color: #333;">Olá ${recipient.name || 'Cliente'},</h2>
                 <div style="margin: 20px 0; line-height: 1.6;">
-                  ${body.replace(/\n/g, '<br>')}
+                  ${htmlBody}
                 </div>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="color: #666; font-size: 12px;">
