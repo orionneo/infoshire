@@ -1,6 +1,7 @@
-import { Apple, ChevronLeft, ChevronRight, Clock, Database, Gamepad2, HardDrive, Laptop, MessageCircle, MessageSquare, Monitor, Shield, Smartphone, Tv, Wrench, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Gamepad2, Laptop, MessageCircle, MessageSquare, Monitor, Package, Shield, ShieldCheck, Wrench } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { BudgetWhatsAppModal } from '@/components/BudgetWhatsAppModal';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
 import { PromotionalPopup } from '@/components/PromotionalPopup';
 import { Button } from '@/components/ui/button';
@@ -70,13 +71,48 @@ export default function Home() {
     },
   ];
 
+  const processSteps: {
+    title: string;
+    description: React.ReactNode;
+    icon: React.ElementType;
+    highlight?: boolean;
+  }[] = [
+    {
+      title: 'Pedido de Orçamento',
+      description: 'O cliente solicita o orçamento pelo site ou WhatsApp de forma rápida e simples.',
+      icon: MessageCircle,
+    },
+    {
+      title: 'Envio ou Entrega do Equipamento',
+      description: 'O equipamento pode ser levado até a loja ou enviado pelos Correios com segurança.',
+      icon: Package,
+    },
+    {
+      title: 'Análise Técnica Especializada',
+      description: 'Nossa equipe realiza uma análise técnica completa e identifica a melhor solução.',
+      icon: Wrench,
+    },
+    {
+      title: 'Orçamento Digital e Aprovação',
+      description: (
+        <>
+          O orçamento é enviado pelo sistema e o <strong>CLIENTE</strong> aprova online, acompanhando cada etapa do serviço.
+        </>
+      ),
+      icon: ShieldCheck,
+      highlight: true,
+    },
+  ];
+
+  const whatsappUrl = 'https://wa.me/5519993352727?text=Olá,%20quero%20um%20orçamento%20rápido';
+
   return (
     <PublicLayout>
       {/* Popup Promocional */}
       <PromotionalPopup />
       
       {/* Hero Section */}
-      <section className="relative bg-transparent py-20 xl:py-32 overflow-hidden">
+      <section className="relative bg-transparent pb-20 pt-28 sm:pt-32 xl:pb-32 xl:pt-36 overflow-hidden">
         <div className="container relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             {/* Logo InfoShire */}
@@ -124,17 +160,27 @@ export default function Home() {
             </div>
             
             <div className="flex flex-col xl:flex-row gap-4 justify-center animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
-              <Button 
-                size="lg" 
-                onClick={() => navigate('/register')} 
-                className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-black font-semibold shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all duration-300"
+              <BudgetWhatsAppModal
+                trigger={(
+                  <Button
+                    size="lg"
+                    className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-black font-semibold shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all duration-300"
+                  >
+                    Pedir Orçamento
+                  </Button>
+                )}
+              />
+              <Button
+                size="lg"
+                onClick={() => navigate('/register')}
+                className="text-lg px-8 py-6 bg-primary/15 hover:bg-primary/25 text-primary font-semibold border border-primary/40 hover:border-primary hover:scale-105 transition-all duration-300"
               >
                 Cadastrar Agora
               </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                onClick={() => navigate('/services')} 
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate('/services')}
                 className="text-lg px-8 py-6 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary hover:scale-105 transition-all duration-300"
               >
                 Nossos Serviços
@@ -238,6 +284,69 @@ export default function Home() {
                 </Card>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* Como Funciona Section */}
+      <section className="py-20 bg-gradient-to-b from-transparent to-card/40 relative">
+        <div className="container relative z-10">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl xl:text-4xl font-bold mb-4">Como funciona na InfoShire</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Menos ligações. Mais transparência. Total controle para o cliente.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            {processSteps.map((step) => {
+              const Icon = step.icon;
+              return (
+                <Card
+                  key={step.title}
+                  className={`bg-card/50 backdrop-blur border-border hover:border-primary/60 transition-all duration-300 hover-lift ${
+                    step.highlight ? 'border-2 border-primary/60 shadow-lg shadow-primary/20' : ''
+                  }`}
+                >
+                  <CardContent className="p-6 flex flex-col gap-4">
+                    <div className="flex items-start justify-between">
+                      <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
+                        <Icon className="h-7 w-7 text-primary" />
+                      </div>
+                      {step.highlight && (
+                        <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
+                          Diferencial InfoShire
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {step.description}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
+            <BudgetWhatsAppModal
+              trigger={(
+                <Button size="lg" className="px-8 py-6 bg-primary text-black hover:bg-primary/90 font-semibold">
+                  Pedir Orçamento
+                </Button>
+              )}
+            />
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => window.open(whatsappUrl, '_blank')}
+              className="px-8 py-6 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-semibold"
+            >
+              WhatsApp
+            </Button>
           </div>
         </div>
       </section>
@@ -366,6 +475,8 @@ function ReviewsCarousel() {
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState<number | null>(null);
   const [totalReviews, setTotalReviews] = useState<number | null>(null);
+  const [expandedReviews, setExpandedReviews] = useState<Record<number, boolean>>({});
+  const maxReviewLength = 180;
 
   // Buscar reviews do Google via Edge Function
   useEffect(() => {
@@ -478,6 +589,13 @@ function ReviewsCarousel() {
     setCurrentIndex(index);
   };
 
+  const toggleReview = (index: number) => {
+    setExpandedReviews((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
@@ -498,39 +616,60 @@ function ReviewsCarousel() {
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
-          {reviews.map((review, index) => (
-            <div key={index} className="w-full flex-shrink-0 px-2">
-              <Card className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-all duration-300 mx-auto max-w-2xl">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    {review.profile_photo_url ? (
-                      <img
-                        src={review.profile_photo_url}
-                        alt={review.author_name}
-                        className="h-12 w-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-                        <span className="text-primary font-bold text-lg">{review.author_name.charAt(0)}</span>
+          {reviews.map((review, index) => {
+            const reviewText = review.text ?? '';
+            const isLong = reviewText.length > maxReviewLength;
+            const isExpanded = expandedReviews[index];
+
+            return (
+              <div key={index} className="w-full flex-shrink-0 px-2">
+                <Card className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-all duration-300 mx-auto max-w-2xl">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      {review.profile_photo_url ? (
+                        <img
+                          src={review.profile_photo_url}
+                          alt={review.author_name}
+                          className="h-12 w-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
+                          <span className="text-primary font-bold text-lg">{review.author_name.charAt(0)}</span>
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-semibold">{review.author_name}</p>
+                        <p className="text-xs text-muted-foreground">{review.relative_time_description || 'Recente'}</p>
                       </div>
-                    )}
-                    <div>
-                      <p className="font-semibold">{review.author_name}</p>
-                      <p className="text-xs text-muted-foreground">{review.relative_time_description || 'Recente'}</p>
                     </div>
-                  </div>
-                  <div className="flex mb-4">
-                    {[...Array(review.rating)].map((_, i) => (
-                      <svg key={i} className="h-5 w-5 text-yellow-400 fill-current" viewBox="0 0 20 20">
-                        <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                      </svg>
-                    ))}
-                  </div>
-                  <p className="text-base text-muted-foreground leading-relaxed">{review.text}</p>
-                </CardContent>
-              </Card>
-            </div>
-          ))}
+                    <div className="flex mb-4">
+                      {[...Array(review.rating)].map((_, i) => (
+                        <svg key={i} className="h-5 w-5 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                          <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                        </svg>
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      <p className="text-base text-muted-foreground leading-relaxed">
+                        {isLong && !isExpanded
+                          ? `${reviewText.slice(0, maxReviewLength).trim()}...`
+                          : reviewText}
+                      </p>
+                      {isLong && (
+                        <button
+                          type="button"
+                          onClick={() => toggleReview(index)}
+                          className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                        >
+                          {isExpanded ? 'Ver menos' : 'Ler mais'}
+                        </button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })}
         </div>
       </div>
 

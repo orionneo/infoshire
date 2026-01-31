@@ -1,11 +1,10 @@
-import { Briefcase, Facebook, Home, Info, Instagram, LogIn, Mail, Menu, MessageCircle, Shield, UserPlus, Wrench, Youtube } from 'lucide-react';
+import { Briefcase, Facebook, Home, Info, Instagram, LogIn, Mail, MessageCircle, Shield, Wrench, Youtube } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ActionBar } from '@/components/ActionBar';
+import { BudgetWhatsAppModal } from '@/components/BudgetWhatsAppModal';
 import { InstallPWA } from '@/components/common/InstallPWA';
 import { SearchBar } from '@/components/SearchBar';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSearchEnabled } from '@/db/api';
 import logoInfoshire from '@/assets/images/logo-infoshire.png';
@@ -62,18 +61,17 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
     },
   ];
 
+  const whatsappUrl = 'https://wa.me/5519993352727?text=Olá,%20quero%20um%20orçamento%20rápido';
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Content Wrapper - Garante que todo conteúdo fique acima do background */}
       <div className="relative z-10 flex min-h-screen flex-col">
-        {/* Action Bar - Botões fixos globais (MOBILE APENAS) */}
-        <ActionBar />
-        
         {/* Install PWA Banner */}
         <InstallPWA />
         
         {/* Header */}
-        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-50 w-full border-b border-primary/20 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/50">
         <div className="container flex h-16 items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             {/* Logo Image */}
@@ -124,15 +122,6 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             >
               <MessageCircle className="h-4 w-4 mr-2" />
               WhatsApp
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="btn-premium-outline rounded-full h-10 px-6 text-primary font-semibold"
-              onClick={() => navigate('/rastrear-os')}
-            >
-              <Shield className="h-4 w-4 mr-2" />
-              Rastrear OS
             </Button>
             
             {user ? (
@@ -236,6 +225,32 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
+      <div className="xl:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-primary/20 bg-black/90 backdrop-blur-md">
+        <div className="container px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              size="lg"
+              className="h-14 bg-primary text-black hover:bg-primary/90 font-semibold"
+              onClick={() => window.open(whatsappUrl, '_blank')}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              WhatsApp
+            </Button>
+            <BudgetWhatsAppModal
+              trigger={(
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="h-14 border-primary/60 text-primary hover:bg-primary/10 hover:border-primary font-semibold"
+                >
+                  Pedir Orçamento
+                </Button>
+              )}
+            />
+          </div>
+        </div>
+      </div>
+      <div className="xl:hidden h-[88px]" />
       {/* Main Content */}
       <main className="flex-1">{children}</main>
       {/* Footer */}
