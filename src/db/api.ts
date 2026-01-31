@@ -1050,9 +1050,12 @@ export async function sendEmailCampaign(data: {
   body: string;
   recipientIds: string[];
   imageUrl?: string;
-}): Promise<void> {
-  const { error } = await supabase.functions.invoke('send-email-campaign', {
+}): Promise<unknown> {
+  const { data: responseData, error } = await supabase.functions.invoke('send-email-campaign', {
     body: JSON.stringify(data),
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
 
   if (error) {
@@ -1064,17 +1067,18 @@ export async function sendEmailCampaign(data: {
     }
     throw new Error(errorMsg || error.message || 'Erro ao enviar campanha de email');
   }
+
+  return responseData;
 }
 
 async function resolveFunctionErrorMessage(error: any): Promise<string> {
-  if (typeof error?.context?.text === 'function') {
-    return await error.context.text();
+  if (error?.context?.error) {
+    return String(error.context.error);
   }
-  if (typeof error?.context?.json === 'function') {
-    const json = await error.context.json();
-    return typeof json === 'string' ? json : JSON.stringify(json);
+  if (error?.message) {
+    return String(error.message);
   }
-  return error?.message ? String(error.message) : String(error);
+  return JSON.stringify(error);
 }
 
 export async function getEmailCampaigns(): Promise<EmailCampaignWithSender[]> {
