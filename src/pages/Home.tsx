@@ -117,9 +117,54 @@ export default function Home() {
   ];
 
   const whatsappUrl = 'https://wa.me/5519993352727?text=Olá,%20quero%20um%20orçamento%20rápido';
+  const logoSparkles = Array.from({ length: 5 });
 
   return (
     <PublicLayout>
+      <style>{`
+        .logo-sparkles {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          isolation: isolate;
+        }
+        .logo-sparkles__item {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: var(--size, 8px);
+          height: var(--size, 8px);
+          border-radius: 999px;
+          background: radial-gradient(circle, rgba(139,255,0,0.85) 0%, rgba(139,255,0,0.3) 45%, transparent 70%);
+          opacity: 0.7;
+          filter: blur(0.4px);
+          transform-origin: center;
+          pointer-events: none;
+          animation: logo-sparkles-orbit var(--speed, 8s) linear infinite,
+            logo-sparkles-twinkle 2.4s ease-in-out infinite;
+          animation-delay: var(--delay, 0s), var(--twinkle-delay, 0s);
+        }
+        .logo-sparkles__item--1 { --orbit: clamp(70px, 12vw, 140px); --speed: 8s; --delay: 0s; --twinkle-delay: 0.2s; --size: 8px; }
+        .logo-sparkles__item--2 { --orbit: clamp(80px, 14vw, 160px); --speed: 10s; --delay: -1.5s; --twinkle-delay: -0.4s; --size: 10px; }
+        .logo-sparkles__item--3 { --orbit: clamp(60px, 10vw, 120px); --speed: 7s; --delay: -3s; --twinkle-delay: -1s; --size: 6px; }
+        .logo-sparkles__item--4 { --orbit: clamp(90px, 16vw, 180px); --speed: 12s; --delay: -2.2s; --twinkle-delay: -0.8s; --size: 9px; }
+        .logo-sparkles__item--5 { --orbit: clamp(65px, 11vw, 130px); --speed: 9s; --delay: -4s; --twinkle-delay: -1.4s; --size: 7px; }
+
+        @keyframes logo-sparkles-orbit {
+          from { transform: translate(-50%, -50%) rotate(0deg) translateX(var(--orbit)) rotate(0deg); }
+          to { transform: translate(-50%, -50%) rotate(360deg) translateX(var(--orbit)) rotate(-360deg); }
+        }
+        @keyframes logo-sparkles-twinkle {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.85; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .logo-sparkles__item {
+            animation: none;
+          }
+        }
+      `}</style>
       {/* Popup Promocional */}
       <PromotionalPopup />
       
@@ -131,15 +176,19 @@ export default function Home() {
             <div className="mb-12 flex justify-center animate-fade-in-up">
               <div className="w-full max-w-lg xl:max-w-3xl relative px-4">
                 <div className="absolute inset-0 bg-primary/20 blur-3xl animate-pulse"></div>
-                <div className="logo-sparkle-wrap">
-                  <div className="logo-electric">
-                    <span className="logo-electric__sweep" aria-hidden="true" />
-                    <img
-                      src={logoInfoshire}
-                      alt="InfoShire - Games e Informática"
-                      className="logo-electric__image w-full h-auto object-contain drop-shadow-[0_0_25px_rgba(139,255,0,0.9)] animate-float"
+                <div className="logo-sparkles">
+                  {logoSparkles.map((_, index) => (
+                    <span
+                      key={`logo-sparkle-${index}`}
+                      className={`logo-sparkles__item logo-sparkles__item--${index + 1}`}
+                      aria-hidden="true"
                     />
-                  </div>
+                  ))}
+                  <img
+                    src={logoInfoshire}
+                    alt="InfoShire - Games e Informática"
+                    className="w-full h-auto object-contain drop-shadow-[0_0_25px_rgba(139,255,0,0.9)] animate-float"
+                  />
                 </div>
               </div>
             </div>
@@ -331,7 +380,7 @@ export default function Home() {
               asChild
               className="px-8 py-6 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-semibold"
             >
-              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" data-whatsapp="true">
                 WhatsApp
               </a>
             </Button>
@@ -456,6 +505,7 @@ export default function Home() {
 function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const touchStartX = useRef<number | null>(null);
   const touchDeltaX = useRef(0);
 
@@ -474,18 +524,19 @@ function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
   }, []);
 
   useEffect(() => {
-    if (prefersReducedMotion) {
+    if (prefersReducedMotion || !isAutoPlaying) {
       return undefined;
     }
 
     const intervalId = window.setInterval(() => {
       setCurrentStep((prev) => (prev + 1) % steps.length);
-    }, 4000);
+    }, 3500);
 
     return () => window.clearInterval(intervalId);
-  }, [prefersReducedMotion, steps.length]);
+  }, [isAutoPlaying, prefersReducedMotion, steps.length]);
 
   const goToStep = (index: number) => {
+    setIsAutoPlaying(false);
     setCurrentStep((index + steps.length) % steps.length);
   };
 
@@ -517,9 +568,7 @@ function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
     touchDeltaX.current = 0;
   };
 
-  const activeStep = steps[currentStep];
-  const nextStep = steps[(currentStep + 1) % steps.length];
-  const ActiveIcon = activeStep.icon;
+  const progressValue = ((currentStep + 1) / steps.length) * 100;
 
   return (
     <div className="space-y-10">
@@ -567,31 +616,57 @@ function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          <Card className="bg-card/60 backdrop-blur border-primary/40 shadow-[0_0_25px_rgba(139,255,0,0.18)]">
-            <CardContent className="p-6 flex flex-col gap-4">
-              <div className="flex items-start justify-between">
-                <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
-                  <ActiveIcon className="h-7 w-7 text-primary" />
-                </div>
-                {activeStep.highlight && (
-                  <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
-                    Diferencial InfoShire
-                  </span>
-                )}
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold mb-2">{activeStep.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {activeStep.description}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="overflow-hidden rounded-2xl border border-primary/20 bg-card/40">
+            <div
+              className="flex transition-transform duration-500 ease-out"
+              style={{ transform: `translateX(-${currentStep * 100}%)` }}
+            >
+              {steps.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <div key={step.title} className="w-full flex-shrink-0 p-6">
+                    <Card className="bg-card/60 backdrop-blur border-primary/40 shadow-[0_0_25px_rgba(139,255,0,0.18)]">
+                      <CardContent className="p-6 flex flex-col gap-4">
+                        <div className="flex items-start justify-between">
+                          <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
+                            <Icon className="h-7 w-7 text-primary" />
+                          </div>
+                          {step.highlight && (
+                            <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
+                              Diferencial InfoShire
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {step.description}
+                          </p>
+                        </div>
+                        <div className="text-xs uppercase tracking-wide text-primary">
+                          Etapa {index + 1} de {steps.length}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
-          <div className="rounded-2xl border border-primary/20 bg-card/40 px-5 py-4 text-sm text-muted-foreground">
-            <span className="text-xs uppercase tracking-wide text-primary/70">Próxima etapa</span>
-            <p className="mt-2 font-semibold text-foreground">{nextStep.title}</p>
-            <p className="text-xs mt-1">{nextStep.description}</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Etapa {currentStep + 1} de {steps.length}</span>
+              {!prefersReducedMotion && !isAutoPlaying && (
+                <span className="text-[10px] uppercase tracking-wide text-primary/70">Autoplay pausado</span>
+              )}
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-primary/10">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${progressValue}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -603,8 +678,8 @@ function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
           return (
             <Card
               key={step.title}
-              className={`bg-card/50 backdrop-blur border-border transition-all duration-300 hover-lift ${
-                isActive ? 'border-primary/70 shadow-lg shadow-primary/30 scale-[1.02]' : 'hover:border-primary/60'
+              className={`relative bg-card/50 backdrop-blur border-border transition-all duration-300 hover-lift ${
+                isActive ? 'border-primary/70 shadow-[0_0_25px_rgba(139,255,0,0.3)] scale-[1.02]' : 'hover:border-primary/60'
               }`}
             >
               <CardContent className="p-6 flex flex-col gap-4">

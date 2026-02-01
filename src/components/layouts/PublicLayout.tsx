@@ -30,7 +30,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
       }
 
       const target = event.target as HTMLElement | null;
-      const triggerButton = target?.closest('[data-whatsapp-trigger]') as HTMLElement | null;
+      const triggerButton = target?.closest('[data-whatsapp="true"], [data-whatsapp-trigger]') as HTMLElement | null;
       const anchor = target?.closest('a[href]') as HTMLAnchorElement | null;
 
       if (triggerButton) {
@@ -44,7 +44,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
       }
 
       const href = anchor.getAttribute('href') ?? '';
-      const isWhatsAppLink = href.includes('wa.me') || href.includes('api.whatsapp.com');
+      const isWhatsAppLink = href.includes('wa.me') || href.includes('api.whatsapp.com') || anchor.dataset.whatsapp === 'true';
 
       if (!isWhatsAppLink) {
         return;
