@@ -1,36 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 
-const MAX_PARTICLES = 52;
-const EDGE_PADDING_MIN = 8;
-const EDGE_PADDING_MAX = 18;
-const OUTER_BAND_PX = 12;
-const CORNER_RATIO = 0.22;
-const ONLY_TOP_RIGHT = true;
-const BLEED = 48;
-
-const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
+const BLEED = 44;
+const DURATION_MS = 14000;
+const SPACING_PX = 2;
+const SMOOTH_WINDOW = 5;
 
 type LogoEdgeSparklesProps = {
   src: string;
   alt?: string;
   className?: string;
-};
-
-type Particle = {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  radius: number;
-  baseAlpha: number;
-  alpha: number;
-  life: number;
-  age: number;
-  streakLength: number;
-  hasStreak: boolean;
-  hasStar: boolean;
-  rotation: number;
-  rotationSpeed: number;
 };
 
 type EdgePoint = {
@@ -41,20 +19,7 @@ type EdgePoint = {
 export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: LogoEdgeSparklesProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const edgePointsRef = useRef<EdgePoint[]>([]);
-  const cornerPoolsRef = useRef<{
-    topLeft: EdgePoint[];
-    topRight: EdgePoint[];
-    bottomLeft: EdgePoint[];
-    bottomRight: EdgePoint[];
-  }>({ topLeft: [], topRight: [], bottomLeft: [], bottomRight: [] });
-  const edgeBoundsRef = useRef({
-    minX: 0,
-    maxX: 0,
-    minY: 0,
-    maxY: 0,
-  });
-  const glowCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const contourRef = useRef<EdgePoint[]>([]);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -83,12 +48,9 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     if (!context) {
       return undefined;
     }
+    const ctx = context;
 
     let animationFrame = 0;
-    let lastTime = 0;
-    let particles: Particle[] = [];
-    let spawnAccumulator = 0;
-    let lastGlowDraw = 0;
     let currentPixelRatio = window.devicePixelRatio || 1;
     let currentSize = { width: 0, height: 0 };
 
@@ -103,21 +65,148 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       canvas.height = Math.max(1, Math.floor(drawH * pixelRatio));
       canvas.style.width = `${drawW}px`;
       canvas.style.height = `${drawH}px`;
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
       currentSize = { width, height };
       drawSize = { width: drawW, height: drawH };
       return { width, height };
     };
 
-    let size = resizeCanvas();
+    resizeCanvas();
     const offscreenCanvas = document.createElement('canvas');
     const offscreenContext = offscreenCanvas.getContext('2d', { willReadFrequently: true });
-    const glowCanvas = document.createElement('canvas');
-    const glowContext = glowCanvas.getContext('2d');
-    glowCanvasRef.current = glowCanvas;
 
-    const updateEdgePoints = () => {
-      if (!offscreenContext || !glowContext) {
+    const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+    const resamplePath = (points: EdgePoint[], spacing: number) => {
+      if (points.length < 2) {
+        return points;
+      }
+      const closed = [...points, points[0]];
+      const resampled: EdgePoint[] = [];
+      let prev = closed[0];
+      resampled.push({ ...prev });
+      let distance = 0;
+      for (let i = 1; i < closed.length; i += 1) {
+        let next = closed[i];
+        let dx = next.x - prev.x;
+        let dy = next.y - prev.y;
+        let segmentLength = Math.hypot(dx, dy);
+        while (distance + segmentLength >= spacing) {
+          const t = (spacing - distance) / segmentLength;
+          const point = { x: prev.x + dx * t, y: prev.y + dy * t };
+          resampled.push(point);
+          prev = point;
+          dx = next.x - prev.x;
+          dy = next.y - prev.y;
+          segmentLength = Math.hypot(dx, dy);
+          distance = 0;
+        }
+        distance += segmentLength;
+        prev = next;
+      }
+      return resampled;
+    };
+
+    const smoothPath = (points: EdgePoint[], windowSize: number) => {
+      if (points.length === 0) {
+        return points;
+      }
+      const radius = Math.floor(windowSize / 2);
+      const smoothed = points.map((_, index) => {
+        let sumX = 0;
+        let sumY = 0;
+        let count = 0;
+        for (let offset = -radius; offset <= radius; offset += 1) {
+          const idx = (index + offset + points.length) % points.length;
+          sumX += points[idx].x;
+          sumY += points[idx].y;
+          count += 1;
+        }
+        return { x: sumX / count, y: sumY / count };
+      });
+      return smoothed;
+    };
+
+    function drawReducedMotion() {
+      const contour = contourRef.current;
+      ctx.clearRect(0, 0, drawSize.width, drawSize.height);
+      if (contour.length === 0) {
+        return;
+      }
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowColor = 'rgba(139,255,0,0.45)';
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = 'rgba(139,255,0,0.08)';
+      const offsetX = BLEED;
+      const offsetY = BLEED;
+      for (let i = 0; i < contour.length; i += 12) {
+        const point = contour[i];
+        ctx.beginPath();
+        ctx.arc(point.x + offsetX, point.y + offsetY, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawTracer(time: number) {
+      const contour = contourRef.current;
+      ctx.clearRect(0, 0, drawSize.width, drawSize.height);
+      if (contour.length === 0) {
+        return;
+      }
+      const t = (time % DURATION_MS) / DURATION_MS;
+      const head = Math.floor(t * contour.length);
+      const tailLen = Math.max(1, Math.floor(contour.length * 0.1));
+      const fadeOut = clamp((t - 0.9) / 0.1, 0, 1);
+      const offsetX = BLEED;
+      const offsetY = BLEED;
+
+      const drawLayer = (
+        color: string,
+        blur: number,
+        alphaScale: number,
+        headRadius: number,
+        tailRadius: number,
+      ) => {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.shadowColor = color;
+        ctx.shadowBlur = blur;
+        for (let k = 0; k <= tailLen; k += 1) {
+          const idx = (head - k + contour.length) % contour.length;
+          const point = contour[idx];
+          const strength = 1 - k / tailLen;
+          let alpha = clamp(0.02 + strength * 0.4, 0, 0.42);
+          alpha *= 1 - fadeOut;
+          const radius = tailRadius + (headRadius - tailRadius) * strength;
+          ctx.fillStyle = color.replace('ALPHA', `${alpha * alphaScale}`);
+          ctx.beginPath();
+          ctx.arc(point.x + offsetX, point.y + offsetY, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      };
+
+      drawLayer('rgba(139,255,0,ALPHA)', 22, 0.55, 2.2, 1.2);
+      drawLayer('rgba(255,255,255,ALPHA)', 12, 1, 1.6, 0.8);
+
+      const headPoint = contour[head % contour.length];
+      if (headPoint) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.shadowColor = 'rgba(255,255,255,0.35)';
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.beginPath();
+        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    const updateContour = () => {
+      if (!offscreenContext) {
         return;
       }
       const image = imageRef.current;
@@ -140,85 +229,121 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
 
       const imageData = offscreenContext.getImageData(0, 0, pixelWidth, pixelHeight);
       const { data } = imageData;
-      const points: EdgePoint[] = [];
-      let minX = pixelWidth;
-      let maxX = 0;
-      let minY = pixelHeight;
-      let maxY = 0;
-      const alphaAt = (x: number, y: number) => {
-        if (x < 0 || y < 0 || x >= pixelWidth || y >= pixelHeight) {
-          return 0;
+      const totalPixels = pixelWidth * pixelHeight;
+      const solid = new Uint8Array(totalPixels);
+      for (let i = 0; i < totalPixels; i += 1) {
+        solid[i] = data[i * 4 + 3] > 32 ? 1 : 0;
+      }
+
+      const outside = new Uint8Array(totalPixels);
+      const queue: number[] = [];
+      const enqueueIfOutside = (x: number, y: number) => {
+        const index = y * pixelWidth + x;
+        if (solid[index] === 0 && outside[index] === 0) {
+          outside[index] = 1;
+          queue.push(index);
         }
-        return data[(y * pixelWidth + x) * 4 + 3];
       };
 
+      for (let x = 0; x < pixelWidth; x += 1) {
+        enqueueIfOutside(x, 0);
+        enqueueIfOutside(x, pixelHeight - 1);
+      }
+      for (let y = 0; y < pixelHeight; y += 1) {
+        enqueueIfOutside(0, y);
+        enqueueIfOutside(pixelWidth - 1, y);
+      }
+
+      while (queue.length > 0) {
+        const index = queue.pop();
+        if (index === undefined) {
+          break;
+        }
+        const x = index % pixelWidth;
+        const y = Math.floor(index / pixelWidth);
+        if (x > 0) enqueueIfOutside(x - 1, y);
+        if (x < pixelWidth - 1) enqueueIfOutside(x + 1, y);
+        if (y > 0) enqueueIfOutside(x, y - 1);
+        if (y < pixelHeight - 1) enqueueIfOutside(x, y + 1);
+      }
+
+      const edgeMask = new Uint8Array(totalPixels);
+      let startPoint: EdgePoint | null = null;
       for (let y = 0; y < pixelHeight; y += 1) {
         for (let x = 0; x < pixelWidth; x += 1) {
-          const alpha = alphaAt(x, y);
-          if (alpha <= 20) {
+          const index = y * pixelWidth + x;
+          if (solid[index] === 0) {
             continue;
           }
-          if (x < minX) {
-            minX = x;
+          const hasOutsideNeighbor =
+            (x > 0 && outside[index - 1] === 1) ||
+            (x < pixelWidth - 1 && outside[index + 1] === 1) ||
+            (y > 0 && outside[index - pixelWidth] === 1) ||
+            (y < pixelHeight - 1 && outside[index + pixelWidth] === 1);
+          if (!hasOutsideNeighbor) {
+            continue;
           }
-          if (x > maxX) {
-            maxX = x;
-          }
-          if (y < minY) {
-            minY = y;
-          }
-          if (y > maxY) {
-            maxY = y;
-          }
-          if (
-            alphaAt(x - 1, y) === 0 ||
-            alphaAt(x + 1, y) === 0 ||
-            alphaAt(x, y - 1) === 0 ||
-            alphaAt(x, y + 1) === 0
-          ) {
-            points.push({ x: x / currentPixelRatio, y: y / currentPixelRatio });
+          edgeMask[index] = 1;
+          if (!startPoint || x > startPoint.x || (x === startPoint.x && y < startPoint.y)) {
+            startPoint = { x, y };
           }
         }
       }
 
-      if (points.length > 0 && minX <= maxX && minY <= maxY) {
-        const cssMinX = minX / currentPixelRatio;
-        const cssMaxX = maxX / currentPixelRatio;
-        const cssMinY = minY / currentPixelRatio;
-        const cssMaxY = maxY / currentPixelRatio;
-        edgeBoundsRef.current = { minX: cssMinX, maxX: cssMaxX, minY: cssMinY, maxY: cssMaxY };
-        const outerBand = points.filter((point) => {
-          const d = Math.min(
-            point.x - cssMinX,
-            cssMaxX - point.x,
-            point.y - cssMinY,
-            cssMaxY - point.y,
-          );
-          return d <= OUTER_BAND_PX;
-        });
-        edgePointsRef.current = outerBand;
-        const cornerW = (cssMaxX - cssMinX) * CORNER_RATIO;
-        const cornerH = (cssMaxY - cssMinY) * CORNER_RATIO;
-        const topRight = outerBand.filter(
-          (point) => point.x >= cssMaxX - cornerW && point.y <= cssMinY + cornerH,
-        );
-        cornerPoolsRef.current = {
-          topLeft: [],
-          topRight: ONLY_TOP_RIGHT ? topRight : [],
-          bottomLeft: [],
-          bottomRight: [],
-        };
-      } else {
-        edgePointsRef.current = [];
-        cornerPoolsRef.current = { topLeft: [], topRight: [], bottomLeft: [], bottomRight: [] };
-        edgeBoundsRef.current = { minX: 0, maxX: size.width, minY: 0, maxY: size.height };
+      if (!startPoint) {
+        contourRef.current = [];
+        return;
       }
 
-      glowCanvas.width = pixelWidth;
-      glowCanvas.height = pixelHeight;
-      glowContext.setTransform(1, 0, 0, 1, 0, 0);
-      glowContext.clearRect(0, 0, pixelWidth, pixelHeight);
-      glowContext.drawImage(image, 0, 0, pixelWidth, pixelHeight);
+      const directions = [
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+        { x: 0, y: 1 },
+        { x: -1, y: 1 },
+        { x: -1, y: 0 },
+        { x: -1, y: -1 },
+        { x: 0, y: -1 },
+        { x: 1, y: -1 },
+      ];
+
+      const contourPixels: EdgePoint[] = [{ ...startPoint }];
+      let current = { ...startPoint };
+      let dir = 0;
+      const maxSteps = totalPixels * 2;
+      for (let steps = 0; steps < maxSteps; steps += 1) {
+        let found = false;
+        for (let i = 0; i < 8; i += 1) {
+          const nextDir = (dir + 6 + i) % 8;
+          const nx = current.x + directions[nextDir].x;
+          const ny = current.y + directions[nextDir].y;
+          if (nx < 0 || ny < 0 || nx >= pixelWidth || ny >= pixelHeight) {
+            continue;
+          }
+          if (edgeMask[ny * pixelWidth + nx] === 1) {
+            current = { x: nx, y: ny };
+            contourPixels.push(current);
+            dir = nextDir;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          break;
+        }
+        if (current.x === startPoint.x && current.y === startPoint.y && contourPixels.length > 4) {
+          break;
+        }
+      }
+
+      const contourCss = contourPixels.map((point) => ({
+        x: point.x / currentPixelRatio,
+        y: point.y / currentPixelRatio,
+      }));
+      const resampled = resamplePath(contourCss, SPACING_PX);
+      contourRef.current = smoothPath(resampled, SMOOTH_WINDOW);
+      if (prefersReducedMotion) {
+        drawReducedMotion();
+      }
     };
 
     const ensureImage = () => {
@@ -226,255 +351,35 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       img.crossOrigin = 'anonymous';
       img.src = src;
       img.onload = () => {
-        updateEdgePoints();
+        updateContour();
       };
       imageRef.current = img;
     };
 
     ensureImage();
     const resizeObserver = new ResizeObserver(() => {
-      size = resizeCanvas();
-      updateEdgePoints();
+      resizeCanvas();
+      updateContour();
     });
     resizeObserver.observe(wrapper);
 
-    const spawnParticle = (forceGlint = false) => {
-      const edgePoints = edgePointsRef.current;
-      const pools = cornerPoolsRef.current;
-      const padding = randomBetween(EDGE_PADDING_MIN, EDGE_PADDING_MAX);
-      let x = 0;
-      let y = 0;
-      let vx = 0;
-      let vy = 0;
-      const baseSpeed = randomBetween(3, 8);
-
-      if (edgePoints.length > 0 || pools.topRight.length > 0) {
-        const selectedPool = pools.topRight.length > 0 ? pools.topRight : edgePoints;
-        const point = selectedPool[Math.floor(Math.random() * selectedPool.length)];
-        x = point.x;
-        y = point.y;
-        const { minX, maxX, minY, maxY } = edgeBoundsRef.current;
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        const dx = x - centerX;
-        const dy = y - centerY;
-        const length = Math.hypot(dx, dy) || 1;
-        const jitter = randomBetween(-1.2, 1.2);
-        vx = (dx / length) * baseSpeed + jitter;
-        vy = (dy / length) * baseSpeed + randomBetween(-1.2, 1.2);
-      } else {
-        const edge = Math.floor(Math.random() * 4);
-        if (edge === 0) {
-          x = randomBetween(padding, size.width - padding);
-          y = padding;
-          vx = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
-          vy = randomBetween(-1.5, 1.5);
-        } else if (edge === 1) {
-          x = size.width - padding;
-          y = randomBetween(padding, size.height - padding);
-          vx = randomBetween(-1.5, 1.5);
-          vy = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
-        } else if (edge === 2) {
-          x = randomBetween(padding, size.width - padding);
-          y = size.height - padding;
-          vx = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
-          vy = randomBetween(-1.5, 1.5);
-        } else {
-          x = padding;
-          y = randomBetween(padding, size.height - padding);
-          vx = randomBetween(-1.5, 1.5);
-          vy = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
-        }
-      }
-
-      const isGlint = forceGlint || Math.random() < 0.13;
-      const baseAlpha = isGlint ? randomBetween(0.6, 0.95) : randomBetween(0.35, 0.75);
-      return {
-        x,
-        y,
-        vx,
-        vy,
-        radius: isGlint ? randomBetween(4, 6) : randomBetween(1.6, 3.4),
-        baseAlpha,
-        alpha: baseAlpha,
-        life: isGlint ? randomBetween(2.6, 4.4) : randomBetween(3.2, 6.2),
-        age: 0,
-        streakLength: isGlint ? randomBetween(24, 40) : randomBetween(12, 22),
-        hasStreak: isGlint || Math.random() < 0.35,
-        hasStar: Math.random() < (isGlint ? 0.4 : 0.12),
-        rotation: randomBetween(0, Math.PI * 2),
-        rotationSpeed: randomBetween(-0.6, 0.6),
-      } satisfies Particle;
-    };
-
-    const drawStar = (particle: Particle, offsetX: number, offsetY: number) => {
-      const rays = 6 + Math.floor(Math.random() * 2);
-      const innerRadius = particle.radius * 0.6;
-      const outerRadius = particle.radius * 2.4;
-      context.save();
-      context.translate(particle.x + offsetX, particle.y + offsetY);
-      context.rotate(particle.rotation);
-      context.beginPath();
-      for (let i = 0; i < rays * 2; i += 1) {
-        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-        const angle = (Math.PI / rays) * i;
-        context.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-      }
-      context.closePath();
-      context.fillStyle = `rgba(255,255,255,${particle.alpha * 0.55})`;
-      context.fill();
-      context.restore();
-    };
-
-    const drawParticle = (particle: Particle) => {
-      const offsetX = BLEED;
-      const offsetY = BLEED;
-      context.beginPath();
-      context.arc(
-        particle.x + offsetX,
-        particle.y + offsetY,
-        particle.radius * 1.9,
-        0,
-        Math.PI * 2,
-      );
-      context.fillStyle = `rgba(139,255,0,${particle.alpha * 0.35})`;
-      context.fill();
-
-      context.beginPath();
-      context.arc(
-        particle.x + offsetX,
-        particle.y + offsetY,
-        particle.radius,
-        0,
-        Math.PI * 2,
-      );
-      context.fillStyle = `rgba(255,255,255,${particle.alpha})`;
-      context.fill();
-
-      if (particle.hasStreak) {
-        context.strokeStyle = `rgba(255,255,255,${particle.alpha * 0.5})`;
-        context.lineWidth = 0.95;
-        context.beginPath();
-        context.moveTo(particle.x + offsetX, particle.y + offsetY);
-        context.lineTo(
-          particle.x + offsetX - particle.vx * 0.08 * particle.streakLength,
-          particle.y + offsetY - particle.vy * 0.08 * particle.streakLength,
-        );
-        context.stroke();
-      }
-
-      if (particle.hasStar) {
-        drawStar(particle, offsetX, offsetY);
-      }
-    };
-
-    const drawOutlineGlow = (time: number) => {
-      if (time - lastGlowDraw < 120 && lastGlowDraw !== 0) {
-        return;
-      }
-      lastGlowDraw = time;
-      if (!glowCanvasRef.current) {
-        return;
-      }
-      context.save();
-      context.globalCompositeOperation = 'lighter';
-      context.globalAlpha = 0.22;
-      context.shadowColor = 'rgba(139,255,0,0.75)';
-      context.shadowBlur = 22;
-      context.drawImage(glowCanvasRef.current, BLEED, BLEED, size.width, size.height);
-      context.restore();
-    };
-
-    const drawStatic = () => {
-      context.clearRect(0, 0, drawSize.width, drawSize.height);
-      drawOutlineGlow(0);
-      particles = Array.from({ length: 4 }, () => spawnParticle(true));
-      context.save();
-      context.globalCompositeOperation = 'lighter';
-      context.shadowColor = 'rgba(139,255,0,0.95)';
-      context.shadowBlur = 42;
-      particles.forEach((particle) => {
-        particle.alpha = Math.max(0.08, particle.baseAlpha * 0.6);
-        particle.hasStreak = false;
-        particle.hasStar = Math.random() < 0.5;
-        drawParticle(particle);
-      });
-      context.restore();
-    };
-
-    const animate = (time: number) => {
-      if (document.hidden) {
-        animationFrame = requestAnimationFrame(animate);
-        return;
-      }
-
-      const delta = (time - lastTime) / 1000;
-      lastTime = time;
-
-      context.clearRect(0, 0, drawSize.width, drawSize.height);
-
-      drawOutlineGlow(time);
-
-      const spawnRate = 40;
-      spawnAccumulator += delta * spawnRate;
-      const availableSlots = MAX_PARTICLES - particles.length;
-      const spawnCount = Math.min(Math.floor(spawnAccumulator), availableSlots, 4);
-      if (spawnCount > 0) {
-        spawnAccumulator -= spawnCount;
-        for (let i = 0; i < spawnCount; i += 1) {
-          particles.push(spawnParticle());
-        }
-      }
-
-      context.save();
-      context.globalCompositeOperation = 'lighter';
-      context.shadowColor = 'rgba(139,255,0,0.95)';
-      context.shadowBlur = 42;
-      particles = particles.filter((particle) => {
-        particle.age += delta;
-        particle.x += particle.vx * delta;
-        particle.y += particle.vy * delta;
-        particle.rotation += particle.rotationSpeed * delta;
-
-        const lifeProgress = particle.age / particle.life;
-        const fade = Math.sin(Math.min(lifeProgress, 1) * Math.PI);
-        particle.alpha = Math.max(0.08, particle.baseAlpha * fade);
-
-        drawParticle(particle);
-        return particle.age < particle.life;
-      });
-      context.restore();
-
-      animationFrame = requestAnimationFrame(animate);
-    };
 
     if (prefersReducedMotion) {
-      drawStatic();
+      drawReducedMotion();
       return () => {
         resizeObserver.disconnect();
       };
     }
 
-    animationFrame = requestAnimationFrame((time) => {
-      lastTime = time;
-      animate(time);
-    });
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        animationFrame = requestAnimationFrame((time) => {
-          lastTime = time;
-          animate(time);
-        });
-      }
+    const animate = (time: number) => {
+      drawTracer(time);
+      animationFrame = requestAnimationFrame(animate);
     };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    animationFrame = requestAnimationFrame(animate);
 
     return () => {
       cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [prefersReducedMotion, src]);
 
