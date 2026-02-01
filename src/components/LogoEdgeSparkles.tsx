@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
-const MAX_PARTICLES = 72;
+const MAX_PARTICLES = 52;
 const EDGE_PADDING_MIN = 8;
 const EDGE_PADDING_MAX = 18;
+const OUTER_BAND_PX = 12;
+const CORNER_RATIO = 0.22;
+const ONLY_TOP_RIGHT = true;
+const BLEED = 48;
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
 
@@ -88,16 +92,20 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     let currentPixelRatio = window.devicePixelRatio || 1;
     let currentSize = { width: 0, height: 0 };
 
+    let drawSize = { width: 0, height: 0 };
     const resizeCanvas = () => {
       const { width, height } = wrapper.getBoundingClientRect();
       const pixelRatio = window.devicePixelRatio || 1;
       currentPixelRatio = pixelRatio;
-      canvas.width = Math.max(1, Math.floor(width * pixelRatio));
-      canvas.height = Math.max(1, Math.floor(height * pixelRatio));
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
+      const drawW = width + BLEED * 2;
+      const drawH = height + BLEED * 2;
+      canvas.width = Math.max(1, Math.floor(drawW * pixelRatio));
+      canvas.height = Math.max(1, Math.floor(drawH * pixelRatio));
+      canvas.style.width = `${drawW}px`;
+      canvas.style.height = `${drawH}px`;
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
       currentSize = { width, height };
+      drawSize = { width: drawW, height: drawH };
       return { width, height };
     };
 
@@ -173,29 +181,35 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         }
       }
 
-      edgePointsRef.current = points;
       if (points.length > 0 && minX <= maxX && minY <= maxY) {
         const cssMinX = minX / currentPixelRatio;
         const cssMaxX = maxX / currentPixelRatio;
         const cssMinY = minY / currentPixelRatio;
         const cssMaxY = maxY / currentPixelRatio;
         edgeBoundsRef.current = { minX: cssMinX, maxX: cssMaxX, minY: cssMinY, maxY: cssMaxY };
-        const cornerW = (cssMaxX - cssMinX) * 0.22;
-        const cornerH = (cssMaxY - cssMinY) * 0.22;
-        const topLeft = points.filter(
-          (point) => point.x <= cssMinX + cornerW && point.y <= cssMinY + cornerH,
-        );
-        const topRight = points.filter(
+        const outerBand = points.filter((point) => {
+          const d = Math.min(
+            point.x - cssMinX,
+            cssMaxX - point.x,
+            point.y - cssMinY,
+            cssMaxY - point.y,
+          );
+          return d <= OUTER_BAND_PX;
+        });
+        edgePointsRef.current = outerBand;
+        const cornerW = (cssMaxX - cssMinX) * CORNER_RATIO;
+        const cornerH = (cssMaxY - cssMinY) * CORNER_RATIO;
+        const topRight = outerBand.filter(
           (point) => point.x >= cssMaxX - cornerW && point.y <= cssMinY + cornerH,
         );
-        const bottomLeft = points.filter(
-          (point) => point.x <= cssMinX + cornerW && point.y >= cssMaxY - cornerH,
-        );
-        const bottomRight = points.filter(
-          (point) => point.x >= cssMaxX - cornerW && point.y >= cssMaxY - cornerH,
-        );
-        cornerPoolsRef.current = { topLeft, topRight, bottomLeft, bottomRight };
+        cornerPoolsRef.current = {
+          topLeft: [],
+          topRight: ONLY_TOP_RIGHT ? topRight : [],
+          bottomLeft: [],
+          bottomRight: [],
+        };
       } else {
+        edgePointsRef.current = [];
         cornerPoolsRef.current = { topLeft: [], topRight: [], bottomLeft: [], bottomRight: [] };
         edgeBoundsRef.current = { minX: 0, maxX: size.width, minY: 0, maxY: size.height };
       }
@@ -234,11 +248,8 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       let vy = 0;
       const baseSpeed = randomBetween(3, 8);
 
-      if (edgePoints.length > 0) {
-        const poolOptions = [pools.topLeft, pools.topRight, pools.bottomLeft, pools.bottomRight].map(
-          (pool) => (pool.length > 0 ? pool : edgePoints),
-        );
-        const selectedPool = poolOptions[Math.floor(Math.random() * poolOptions.length)];
+      if (edgePoints.length > 0 || pools.topRight.length > 0) {
+        const selectedPool = pools.topRight.length > 0 ? pools.topRight : edgePoints;
         const point = selectedPool[Math.floor(Math.random() * selectedPool.length)];
         x = point.x;
         y = point.y;
@@ -296,12 +307,12 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       } satisfies Particle;
     };
 
-    const drawStar = (particle: Particle) => {
+    const drawStar = (particle: Particle, offsetX: number, offsetY: number) => {
       const rays = 6 + Math.floor(Math.random() * 2);
       const innerRadius = particle.radius * 0.6;
       const outerRadius = particle.radius * 2.4;
       context.save();
-      context.translate(particle.x, particle.y);
+      context.translate(particle.x + offsetX, particle.y + offsetY);
       context.rotate(particle.rotation);
       context.beginPath();
       for (let i = 0; i < rays * 2; i += 1) {
@@ -316,13 +327,27 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     };
 
     const drawParticle = (particle: Particle) => {
+      const offsetX = BLEED;
+      const offsetY = BLEED;
       context.beginPath();
-      context.arc(particle.x, particle.y, particle.radius * 1.9, 0, Math.PI * 2);
+      context.arc(
+        particle.x + offsetX,
+        particle.y + offsetY,
+        particle.radius * 1.9,
+        0,
+        Math.PI * 2,
+      );
       context.fillStyle = `rgba(139,255,0,${particle.alpha * 0.35})`;
       context.fill();
 
       context.beginPath();
-      context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+      context.arc(
+        particle.x + offsetX,
+        particle.y + offsetY,
+        particle.radius,
+        0,
+        Math.PI * 2,
+      );
       context.fillStyle = `rgba(255,255,255,${particle.alpha})`;
       context.fill();
 
@@ -330,16 +355,16 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         context.strokeStyle = `rgba(255,255,255,${particle.alpha * 0.5})`;
         context.lineWidth = 0.95;
         context.beginPath();
-        context.moveTo(particle.x, particle.y);
+        context.moveTo(particle.x + offsetX, particle.y + offsetY);
         context.lineTo(
-          particle.x - particle.vx * 0.08 * particle.streakLength,
-          particle.y - particle.vy * 0.08 * particle.streakLength,
+          particle.x + offsetX - particle.vx * 0.08 * particle.streakLength,
+          particle.y + offsetY - particle.vy * 0.08 * particle.streakLength,
         );
         context.stroke();
       }
 
       if (particle.hasStar) {
-        drawStar(particle);
+        drawStar(particle, offsetX, offsetY);
       }
     };
 
@@ -356,12 +381,12 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       context.globalAlpha = 0.22;
       context.shadowColor = 'rgba(139,255,0,0.75)';
       context.shadowBlur = 22;
-      context.drawImage(glowCanvasRef.current, 0, 0, size.width, size.height);
+      context.drawImage(glowCanvasRef.current, BLEED, BLEED, size.width, size.height);
       context.restore();
     };
 
     const drawStatic = () => {
-      context.clearRect(0, 0, size.width, size.height);
+      context.clearRect(0, 0, drawSize.width, drawSize.height);
       drawOutlineGlow(0);
       particles = Array.from({ length: 4 }, () => spawnParticle(true));
       context.save();
@@ -386,11 +411,11 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       const delta = (time - lastTime) / 1000;
       lastTime = time;
 
-      context.clearRect(0, 0, size.width, size.height);
+      context.clearRect(0, 0, drawSize.width, drawSize.height);
 
       drawOutlineGlow(time);
 
-      const spawnRate = 70;
+      const spawnRate = 40;
       spawnAccumulator += delta * spawnRate;
       const availableSlots = MAX_PARTICLES - particles.length;
       const spawnCount = Math.min(Math.floor(spawnAccumulator), availableSlots, 4);
@@ -466,7 +491,14 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       />
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 z-20 pointer-events-none"
+        className="z-20 pointer-events-none"
+        style={{
+          position: 'absolute',
+          left: `-${BLEED}px`,
+          top: `-${BLEED}px`,
+          width: `calc(100% + ${BLEED * 2}px)`,
+          height: `calc(100% + ${BLEED * 2}px)`,
+        }}
         aria-hidden="true"
       />
     </div>
