@@ -230,10 +230,10 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         tailLen,
         offsetX,
         offsetY,
-        12,
+        9,
         'rgba(139,255,0,0.85)',
-        42,
-        0.3,
+        30,
+        0.24,
         { r: 139, g: 255, b: 0 },
       );
       drawTailLayer(
@@ -242,10 +242,10 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         tailLen,
         offsetX,
         offsetY,
-        7,
+        5.5,
         'rgba(139,255,0,0.65)',
-        22,
-        0.35,
+        16,
+        0.28,
         { r: 139, g: 255, b: 0 },
       );
       drawTailLayer(
@@ -254,10 +254,10 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         tailLen,
         offsetX,
         offsetY,
-        2.8,
+        2.1,
         'rgba(255,255,255,0.55)',
-        14,
-        0.55,
+        10,
+        0.42,
         { r: 255, g: 255, b: 255 },
       );
 
@@ -266,16 +266,16 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         ctx.shadowColor = 'rgba(139,255,0,0.28)';
-        ctx.shadowBlur = 34;
-        ctx.fillStyle = 'rgba(139,255,0,0.26)';
+        ctx.shadowBlur = 24;
+        ctx.fillStyle = 'rgba(139,255,0,0.18)';
         ctx.beginPath();
-        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 9, 0, Math.PI * 2);
+        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 6.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowColor = 'rgba(255,255,255,0.45)';
-        ctx.shadowBlur = 16;
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = 'rgba(255,255,255,0.28)';
         ctx.beginPath();
-        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 4.2, 0, Math.PI * 2);
+        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 3.2, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -301,14 +301,16 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       offscreenCanvas.height = pixelHeight;
       offscreenContext.setTransform(1, 0, 0, 1, 0, 0);
       offscreenContext.clearRect(0, 0, pixelWidth, pixelHeight);
+      offscreenContext.filter = 'blur(2px)';
       offscreenContext.drawImage(image, 0, 0, pixelWidth, pixelHeight);
+      offscreenContext.filter = 'none';
 
       const imageData = offscreenContext.getImageData(0, 0, pixelWidth, pixelHeight);
       const { data } = imageData;
       const totalPixels = pixelWidth * pixelHeight;
       const solid = new Uint8Array(totalPixels);
       for (let i = 0; i < totalPixels; i += 1) {
-        solid[i] = data[i * 4 + 3] > 32 ? 1 : 0;
+        solid[i] = data[i * 4 + 3] > 20 ? 1 : 0;
       }
 
       const outside = new Uint8Array(totalPixels);
@@ -344,7 +346,6 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       }
 
       const edgeMask = new Uint8Array(totalPixels);
-      let startPoint: EdgePoint | null = null;
       for (let y = 0; y < pixelHeight; y += 1) {
         for (let x = 0; x < pixelWidth; x += 1) {
           const index = y * pixelWidth + x;
@@ -360,15 +361,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
             continue;
           }
           edgeMask[index] = 1;
-          if (!startPoint || x > startPoint.x || (x === startPoint.x && y < startPoint.y)) {
-            startPoint = { x, y };
-          }
         }
-      }
-
-      if (!startPoint) {
-        contourRef.current = [];
-        return;
       }
 
       const directions = [
@@ -382,33 +375,59 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         { x: 1, y: -1 },
       ];
 
-      const contourPixels: EdgePoint[] = [{ ...startPoint }];
-      let current = { ...startPoint };
-      let dir = 0;
-      const maxSteps = totalPixels * 2;
-      for (let steps = 0; steps < maxSteps; steps += 1) {
-        let found = false;
-        for (let i = 0; i < 8; i += 1) {
-          const nextDir = (dir + 6 + i) % 8;
-          const nx = current.x + directions[nextDir].x;
-          const ny = current.y + directions[nextDir].y;
-          if (nx < 0 || ny < 0 || nx >= pixelWidth || ny >= pixelHeight) {
-            continue;
+      const traceContour = (start: EdgePoint, visited: Uint8Array) => {
+        const contourPixels: EdgePoint[] = [{ ...start }];
+        visited[start.y * pixelWidth + start.x] = 1;
+        let current = { ...start };
+        let dir = 0;
+        const maxSteps = totalPixels * 2;
+        for (let steps = 0; steps < maxSteps; steps += 1) {
+          let found = false;
+          for (let i = 0; i < 8; i += 1) {
+            const nextDir = (dir + 6 + i) % 8;
+            const nx = current.x + directions[nextDir].x;
+            const ny = current.y + directions[nextDir].y;
+            if (nx < 0 || ny < 0 || nx >= pixelWidth || ny >= pixelHeight) {
+              continue;
+            }
+            if (edgeMask[ny * pixelWidth + nx] === 1) {
+              current = { x: nx, y: ny };
+              contourPixels.push(current);
+              visited[ny * pixelWidth + nx] = 1;
+              dir = nextDir;
+              found = true;
+              break;
+            }
           }
-          if (edgeMask[ny * pixelWidth + nx] === 1) {
-            current = { x: nx, y: ny };
-            contourPixels.push(current);
-            dir = nextDir;
-            found = true;
+          if (!found) {
+            break;
+          }
+          if (current.x === start.x && current.y === start.y && contourPixels.length > 4) {
             break;
           }
         }
-        if (!found) {
-          break;
+        return contourPixels;
+      };
+
+      const visited = new Uint8Array(totalPixels);
+      const contours: EdgePoint[][] = [];
+      for (let y = 0; y < pixelHeight; y += 1) {
+        for (let x = 0; x < pixelWidth; x += 1) {
+          const index = y * pixelWidth + x;
+          if (edgeMask[index] === 1 && visited[index] === 0) {
+            contours.push(traceContour({ x, y }, visited));
+          }
         }
-        if (current.x === startPoint.x && current.y === startPoint.y && contourPixels.length > 4) {
-          break;
-        }
+      }
+
+      const contourPixels = contours.reduce<EdgePoint[]>(
+        (longest, contour) => (contour.length > longest.length ? contour : longest),
+        [],
+      );
+
+      if (contourPixels.length === 0) {
+        contourRef.current = [];
+        return;
       }
 
       const contourCss = contourPixels.map((point) => ({
