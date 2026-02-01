@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
-const BLEED = 44;
-const DURATION_MS = 14000;
+const BLEED = 64;
+const DURATION_MS = 5400;
+const FADE_ALPHA = 0.085;
+const TAIL_RATIO = 0.18;
 const SPACING_PX = 2;
-const SMOOTH_WINDOW = 5;
+const SMOOTH_WINDOW = 7;
 
 type LogoEdgeSparklesProps = {
   src: string;
@@ -76,6 +78,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     const offscreenContext = offscreenCanvas.getContext('2d', { willReadFrequently: true });
 
     const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+    const rgba = (r: number, g: number, b: number, a: number) => `rgba(${r},${g},${b},${a})`;
 
     const resamplePath = (points: EdgePoint[], spacing: number) => {
       if (points.length < 2) {
@@ -135,71 +138,144 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       }
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.shadowColor = 'rgba(139,255,0,0.45)';
-      ctx.shadowBlur = 16;
-      ctx.fillStyle = 'rgba(139,255,0,0.08)';
+      ctx.shadowColor = 'rgba(139,255,0,0.35)';
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 3.5;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(139,255,0,0.2)';
       const offsetX = BLEED;
       const offsetY = BLEED;
-      for (let i = 0; i < contour.length; i += 12) {
-        const point = contour[i];
+      ctx.beginPath();
+      contour.forEach((point, index) => {
+        const x = point.x + offsetX;
+        const y = point.y + offsetY;
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.closePath();
+      ctx.stroke();
+      ctx.shadowColor = 'rgba(255,255,255,0.2)';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const drawTailLayer = (
+      contour: EdgePoint[],
+      headIndex: number,
+      tailLen: number,
+      offsetX: number,
+      offsetY: number,
+      lineWidth: number,
+      shadowColor: string,
+      shadowBlur: number,
+      baseAlpha: number,
+      color: { r: number; g: number; b: number },
+    ) => {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineWidth = lineWidth;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.shadowColor = shadowColor;
+      ctx.shadowBlur = shadowBlur;
+      const length = contour.length;
+      for (let k = 0; k < tailLen; k += 1) {
+        const idx = (headIndex - k + length) % length;
+        const nextIdx = (headIndex - k - 1 + length) % length;
+        const p1 = contour[idx];
+        const p2 = contour[nextIdx];
+        const strength = 1 - k / tailLen;
+        const alpha = Math.pow(strength, 1.6) * baseAlpha;
+        if (alpha <= 0) {
+          continue;
+        }
+        ctx.strokeStyle = rgba(color.r, color.g, color.b, alpha);
         ctx.beginPath();
-        ctx.arc(point.x + offsetX, point.y + offsetY, 1.6, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(p1.x + offsetX, p1.y + offsetY);
+        ctx.lineTo(p2.x + offsetX, p2.y + offsetY);
+        ctx.stroke();
       }
       ctx.restore();
     }
 
     function drawTracer(time: number) {
       const contour = contourRef.current;
-      ctx.clearRect(0, 0, drawSize.width, drawSize.height);
-      if (contour.length === 0) {
+      if (contour.length < 2) {
         return;
       }
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = `rgba(0,0,0,${FADE_ALPHA})`;
+      ctx.fillRect(0, 0, drawSize.width, drawSize.height);
+      ctx.restore();
       const t = (time % DURATION_MS) / DURATION_MS;
       const head = Math.floor(t * contour.length);
-      const tailLen = Math.max(1, Math.floor(contour.length * 0.1));
-      const fadeOut = clamp((t - 0.9) / 0.1, 0, 1);
+      const tailLen = Math.min(
+        contour.length - 1,
+        Math.max(30, Math.floor(contour.length * TAIL_RATIO)),
+      );
       const offsetX = BLEED;
       const offsetY = BLEED;
 
-      const drawLayer = (
-        color: string,
-        blur: number,
-        alphaScale: number,
-        headRadius: number,
-        tailRadius: number,
-      ) => {
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.shadowColor = color;
-        ctx.shadowBlur = blur;
-        for (let k = 0; k <= tailLen; k += 1) {
-          const idx = (head - k + contour.length) % contour.length;
-          const point = contour[idx];
-          const strength = 1 - k / tailLen;
-          let alpha = clamp(0.02 + strength * 0.4, 0, 0.42);
-          alpha *= 1 - fadeOut;
-          const radius = tailRadius + (headRadius - tailRadius) * strength;
-          ctx.fillStyle = color.replace('ALPHA', `${alpha * alphaScale}`);
-          ctx.beginPath();
-          ctx.arc(point.x + offsetX, point.y + offsetY, radius, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
-      };
-
-      drawLayer('rgba(139,255,0,ALPHA)', 22, 0.55, 2.2, 1.2);
-      drawLayer('rgba(255,255,255,ALPHA)', 12, 1, 1.6, 0.8);
+      drawTailLayer(
+        contour,
+        head,
+        tailLen,
+        offsetX,
+        offsetY,
+        12,
+        'rgba(139,255,0,0.85)',
+        42,
+        0.3,
+        { r: 139, g: 255, b: 0 },
+      );
+      drawTailLayer(
+        contour,
+        head,
+        tailLen,
+        offsetX,
+        offsetY,
+        7,
+        'rgba(139,255,0,0.65)',
+        22,
+        0.35,
+        { r: 139, g: 255, b: 0 },
+      );
+      drawTailLayer(
+        contour,
+        head,
+        tailLen,
+        offsetX,
+        offsetY,
+        2.8,
+        'rgba(255,255,255,0.55)',
+        14,
+        0.55,
+        { r: 255, g: 255, b: 255 },
+      );
 
       const headPoint = contour[head % contour.length];
       if (headPoint) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.shadowColor = 'rgba(255,255,255,0.35)';
-        ctx.shadowBlur = 18;
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.shadowColor = 'rgba(139,255,0,0.28)';
+        ctx.shadowBlur = 34;
+        ctx.fillStyle = 'rgba(139,255,0,0.26)';
         ctx.beginPath();
-        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 2.6, 0, Math.PI * 2);
+        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowColor = 'rgba(255,255,255,0.45)';
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.beginPath();
+        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 4.2, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -341,6 +417,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       }));
       const resampled = resamplePath(contourCss, SPACING_PX);
       contourRef.current = smoothPath(resampled, SMOOTH_WINDOW);
+      ctx.clearRect(0, 0, drawSize.width, drawSize.height);
       if (prefersReducedMotion) {
         drawReducedMotion();
       }
@@ -386,7 +463,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
   return (
     <div
       ref={wrapperRef}
-      className={`relative inline-block w-full ${className ?? ''}`.trim()}
+      className={`relative inline-block w-full overflow-visible ${className ?? ''}`.trim()}
     >
       <img
         src={src}
