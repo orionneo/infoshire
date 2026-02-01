@@ -2,6 +2,7 @@ import { Activity, ChevronLeft, ChevronRight, ClipboardList, Clock, Gamepad2, La
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BudgetWhatsAppModal } from '@/components/BudgetWhatsAppModal';
+import { LogoEdgeSparkles } from '@/components/LogoEdgeSparkles';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
 import { PromotionalPopup } from '@/components/PromotionalPopup';
 import { Button } from '@/components/ui/button';
@@ -116,55 +117,8 @@ export default function Home() {
     },
   ];
 
-  const whatsappUrl = 'https://wa.me/5519993352727?text=Olá,%20quero%20um%20orçamento%20rápido';
-  const logoSparkles = Array.from({ length: 5 });
-
   return (
     <PublicLayout>
-      <style>{`
-        .logo-sparkles {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          isolation: isolate;
-        }
-        .logo-sparkles__item {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: var(--size, 8px);
-          height: var(--size, 8px);
-          border-radius: 999px;
-          background: radial-gradient(circle, rgba(139,255,0,0.85) 0%, rgba(139,255,0,0.3) 45%, transparent 70%);
-          opacity: 0.7;
-          filter: blur(0.4px);
-          transform-origin: center;
-          pointer-events: none;
-          animation: logo-sparkles-orbit var(--speed, 8s) linear infinite,
-            logo-sparkles-twinkle 2.4s ease-in-out infinite;
-          animation-delay: var(--delay, 0s), var(--twinkle-delay, 0s);
-        }
-        .logo-sparkles__item--1 { --orbit: clamp(70px, 12vw, 140px); --speed: 8s; --delay: 0s; --twinkle-delay: 0.2s; --size: 8px; }
-        .logo-sparkles__item--2 { --orbit: clamp(80px, 14vw, 160px); --speed: 10s; --delay: -1.5s; --twinkle-delay: -0.4s; --size: 10px; }
-        .logo-sparkles__item--3 { --orbit: clamp(60px, 10vw, 120px); --speed: 7s; --delay: -3s; --twinkle-delay: -1s; --size: 6px; }
-        .logo-sparkles__item--4 { --orbit: clamp(90px, 16vw, 180px); --speed: 12s; --delay: -2.2s; --twinkle-delay: -0.8s; --size: 9px; }
-        .logo-sparkles__item--5 { --orbit: clamp(65px, 11vw, 130px); --speed: 9s; --delay: -4s; --twinkle-delay: -1.4s; --size: 7px; }
-
-        @keyframes logo-sparkles-orbit {
-          from { transform: translate(-50%, -50%) rotate(0deg) translateX(var(--orbit)) rotate(0deg); }
-          to { transform: translate(-50%, -50%) rotate(360deg) translateX(var(--orbit)) rotate(-360deg); }
-        }
-        @keyframes logo-sparkles-twinkle {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.85; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .logo-sparkles__item {
-            animation: none;
-          }
-        }
-      `}</style>
       {/* Popup Promocional */}
       <PromotionalPopup />
       
@@ -176,20 +130,11 @@ export default function Home() {
             <div className="mb-12 flex justify-center animate-fade-in-up">
               <div className="w-full max-w-lg xl:max-w-3xl relative px-4">
                 <div className="absolute inset-0 bg-primary/20 blur-3xl animate-pulse"></div>
-                <div className="logo-sparkles">
-                  {logoSparkles.map((_, index) => (
-                    <span
-                      key={`logo-sparkle-${index}`}
-                      className={`logo-sparkles__item logo-sparkles__item--${index + 1}`}
-                      aria-hidden="true"
-                    />
-                  ))}
-                  <img
-                    src={logoInfoshire}
-                    alt="InfoShire - Games e Informática"
-                    className="w-full h-auto object-contain drop-shadow-[0_0_25px_rgba(139,255,0,0.9)] animate-float"
-                  />
-                </div>
+                <LogoEdgeSparkles
+                  src={logoInfoshire}
+                  alt="InfoShire - Games e Informática"
+                  className="animate-float drop-shadow-[0_0_10px_rgba(255,255,255,0.25)]"
+                />
               </div>
             </div>
             
@@ -253,6 +198,19 @@ export default function Home() {
               </Button>
             </div>
           </div>
+        </div>
+      </section>
+      {/* Como Funciona Section */}
+      <section className="py-10 md:py-16 bg-gradient-to-b from-transparent to-card/40 relative">
+        <div className="container relative z-10">
+          <div className="text-center mb-6 md:mb-10">
+            <h2 className="text-2xl md:text-3xl xl:text-4xl font-bold mb-4">Como funciona na InfoShire</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Menos ligações. Mais transparência. Total controle para o cliente.
+            </p>
+          </div>
+
+          <ProcessFlow steps={processSteps} />
         </div>
       </section>
       {/* Features Section */}
@@ -350,40 +308,6 @@ export default function Home() {
                 </Card>
               );
             })}
-          </div>
-        </div>
-      </section>
-
-      {/* Como Funciona Section */}
-      <section className="py-20 bg-gradient-to-b from-transparent to-card/40 relative">
-        <div className="container relative z-10">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl xl:text-4xl font-bold mb-4">Como funciona na InfoShire</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Menos ligações. Mais transparência. Total controle para o cliente.
-            </p>
-          </div>
-
-          <ProcessFlow steps={processSteps} />
-
-          <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
-            <BudgetWhatsAppModal
-              trigger={(
-                <Button size="lg" className="px-8 py-6 bg-primary text-black hover:bg-primary/90 font-semibold">
-                  Pedir Orçamento
-                </Button>
-              )}
-            />
-            <Button
-              size="lg"
-              variant="outline"
-              asChild
-              className="px-8 py-6 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-semibold"
-            >
-              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" data-whatsapp="true">
-                WhatsApp
-              </a>
-            </Button>
           </div>
         </div>
       </section>
@@ -624,12 +548,12 @@ function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
               {steps.map((step, index) => {
                 const Icon = step.icon;
                 return (
-                  <div key={step.title} className="w-full flex-shrink-0 p-6">
-                    <Card className="bg-card/60 backdrop-blur border-primary/40 shadow-[0_0_25px_rgba(139,255,0,0.18)]">
-                      <CardContent className="p-6 flex flex-col gap-4">
+                  <div key={step.title} className="w-full flex-shrink-0 p-4">
+                    <Card className="bg-card/60 backdrop-blur border-primary/40 shadow-[0_0_18px_rgba(139,255,0,0.12)]">
+                      <CardContent className="p-4 flex flex-col gap-4">
                         <div className="flex items-start justify-between">
-                          <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
-                            <Icon className="h-7 w-7 text-primary" />
+                          <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
+                            <Icon className="h-6 w-6 text-primary" />
                           </div>
                           {step.highlight && (
                             <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
