@@ -321,6 +321,103 @@ All colors MUST be HSL.
     ring-color: hsl(var(--primary));
     ring-offset: 2px;
   }
+
+  @keyframes logo-electric-spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes logo-electric-pulse {
+    0%, 100% {
+      box-shadow: 0 0 18px hsl(var(--primary) / 0.35), inset 0 0 12px hsl(var(--primary) / 0.25);
+      opacity: 0.7;
+    }
+    50% {
+      box-shadow: 0 0 28px hsl(var(--primary) / 0.55), inset 0 0 18px hsl(var(--primary) / 0.4);
+      opacity: 1;
+    }
+  }
+
+  @keyframes logo-electric-sweep {
+    0% {
+      transform: translateX(-55%);
+      opacity: 0;
+    }
+    30% {
+      opacity: 0.35;
+    }
+    60% {
+      opacity: 0.2;
+    }
+    100% {
+      transform: translateX(55%);
+      opacity: 0;
+    }
+  }
+
+  .logo-electric {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    isolation: isolate;
+  }
+
+  .logo-electric::before {
+    content: '';
+    position: absolute;
+    inset: -18px;
+    border-radius: 32px;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      hsl(var(--primary) / 0.35) 80deg,
+      transparent 160deg,
+      hsl(180 100% 60% / 0.25) 240deg,
+      transparent 320deg
+    );
+    filter: blur(14px);
+    animation: logo-electric-spin 10s linear infinite;
+    z-index: 0;
+  }
+
+  .logo-electric::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 26px;
+    border: 1px solid hsl(var(--primary) / 0.4);
+    animation: logo-electric-pulse 3.2s ease-in-out infinite;
+    z-index: 1;
+  }
+
+  .logo-electric__sweep {
+    position: absolute;
+    inset: -10px;
+    border-radius: 28px;
+    background: linear-gradient(120deg, transparent 0%, hsl(var(--primary) / 0.4) 45%, transparent 70%);
+    filter: blur(6px);
+    mix-blend-mode: screen;
+    animation: logo-electric-sweep 4.5s ease-in-out infinite;
+    z-index: 2;
+  }
+
+  .logo-electric__image {
+    position: relative;
+    z-index: 3;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .logo-electric::before,
+    .logo-electric::after,
+    .logo-electric__sweep {
+      animation: none;
+    }
+  }
 }
 
 @layer base {

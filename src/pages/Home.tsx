@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Clock, Gamepad2, Laptop, MessageCircle, MessageSquare, Monitor, Package, Shield, ShieldCheck, Wrench } from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight, ClipboardList, Clock, Gamepad2, Laptop, MessageSquare, Microscope, Monitor, Package, Shield, ShieldCheck, Truck, Wrench } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BudgetWhatsAppModal } from '@/components/BudgetWhatsAppModal';
@@ -79,28 +79,38 @@ export default function Home() {
   }[] = [
     {
       title: 'Pedido de Orçamento',
-      description: 'O cliente solicita o orçamento pelo site ou WhatsApp de forma rápida e simples.',
-      icon: MessageCircle,
+      description: 'Cliente solicita orçamento pelo site ou WhatsApp.',
+      icon: ClipboardList,
     },
     {
-      title: 'Envio ou Entrega do Equipamento',
-      description: 'O equipamento pode ser levado até a loja ou enviado pelos Correios com segurança.',
+      title: 'Entrega ou Envio do Equipamento',
+      description: 'Cliente leva o equipamento ou envia pelos Correios.',
       icon: Package,
     },
     {
       title: 'Análise Técnica Especializada',
-      description: 'Nossa equipe realiza uma análise técnica completa e identifica a melhor solução.',
-      icon: Wrench,
+      description: 'Avaliação profissional é realizada.',
+      icon: Microscope,
     },
     {
-      title: 'Orçamento Digital e Aprovação',
+      title: 'Orçamento Digital + Aprovação do Cliente',
       description: (
         <>
-          O orçamento é enviado pelo sistema e o <strong>CLIENTE</strong> aprova online, acompanhando cada etapa do serviço.
+          O <strong>CLIENTE</strong> aprova o orçamento pelo sistema.
         </>
       ),
       icon: ShieldCheck,
       highlight: true,
+    },
+    {
+      title: 'Acompanhamento em Tempo Real',
+      description: 'Cliente acompanha cada etapa.',
+      icon: Activity,
+    },
+    {
+      title: 'Retirada ou Envio Final',
+      description: 'Equipamento finalizado e entregue.',
+      icon: Truck,
     },
   ];
 
@@ -119,11 +129,14 @@ export default function Home() {
             <div className="mb-12 flex justify-center animate-fade-in-up">
               <div className="w-full max-w-lg xl:max-w-3xl relative px-4">
                 <div className="absolute inset-0 bg-primary/20 blur-3xl animate-pulse"></div>
-                <img
-                  src={logoInfoshire}
-                  alt="InfoShire - Games e Informática"
-                  className="relative w-full h-auto object-contain drop-shadow-[0_0_25px_rgba(139,255,0,0.9)] animate-float"
-                />
+                <div className="logo-electric">
+                  <span className="logo-electric__sweep" aria-hidden="true" />
+                  <img
+                    src={logoInfoshire}
+                    alt="InfoShire - Games e Informática"
+                    className="logo-electric__image w-full h-auto object-contain drop-shadow-[0_0_25px_rgba(139,255,0,0.9)] animate-float"
+                  />
+                </div>
               </div>
             </div>
             
@@ -298,7 +311,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {processSteps.map((step) => {
               const Icon = step.icon;
               return (
@@ -342,10 +355,12 @@ export default function Home() {
             <Button
               size="lg"
               variant="outline"
-              onClick={() => window.open(whatsappUrl, '_blank')}
+              asChild
               className="px-8 py-6 border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-semibold"
             >
-              WhatsApp
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                WhatsApp
+              </a>
             </Button>
           </div>
         </div>

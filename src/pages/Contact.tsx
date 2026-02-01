@@ -1,4 +1,5 @@
 import { Mail, MapPin, MessageCircle, Phone } from 'lucide-react';
+import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
 import { Button } from '@/components/ui/button';
@@ -21,14 +22,19 @@ export default function Contact() {
       message: '',
     },
   });
+  const whatsappLinkRef = useRef<HTMLAnchorElement | null>(null);
+  const fallbackWhatsappUrl = 'https://wa.me/5519993352727?text=Olá,%20estou%20vindo%20do%20site';
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (_data: any) => {
     // Formatar mensagem para WhatsApp
     const whatsappMessage = `Olá, estou vindo do site`;
     const whatsappUrl = `https://wa.me/5519993352727?text=${encodeURIComponent(whatsappMessage)}`;
     
     // Abrir WhatsApp em nova aba
-    window.open(whatsappUrl, '_blank');
+    if (whatsappLinkRef.current) {
+      whatsappLinkRef.current.href = whatsappUrl;
+      whatsappLinkRef.current.click();
+    }
     
     toast({
       title: 'Redirecionando para WhatsApp!',
@@ -174,6 +180,9 @@ export default function Contact() {
               <CardContent>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <a ref={whatsappLinkRef} href={fallbackWhatsappUrl} className="sr-only">
+                      WhatsApp
+                    </a>
                     <FormField
                       control={form.control}
                       name="name"
