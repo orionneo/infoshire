@@ -35,6 +35,7 @@ import ResetPassword from './pages/ResetPassword';
 import Services from './pages/Services';
 import TrackOrder from './pages/TrackOrder';
 import AuthCallback from './pages/AuthCallback';
+import Privacy from './pages/Privacy';
 
 interface RouteConfig {
   name: string;
@@ -64,6 +65,11 @@ const routes: RouteConfig[] = [
     name: 'Contact',
     path: '/contact',
     element: <Contact />,
+  },
+  {
+    name: 'Privacy',
+    path: '/privacy',
+    element: <Privacy />,
   },
   {
     name: 'Track Order',
