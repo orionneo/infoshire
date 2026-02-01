@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const MAX_PARTICLES = 110;
+const MAX_PARTICLES = 72;
 const EDGE_PADDING_MIN = 8;
 const EDGE_PADDING_MAX = 18;
 
@@ -38,6 +38,18 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const edgePointsRef = useRef<EdgePoint[]>([]);
+  const cornerPoolsRef = useRef<{
+    topLeft: EdgePoint[];
+    topRight: EdgePoint[];
+    bottomLeft: EdgePoint[];
+    bottomRight: EdgePoint[];
+  }>({ topLeft: [], topRight: [], bottomLeft: [], bottomRight: [] });
+  const edgeBoundsRef = useRef({
+    minX: 0,
+    maxX: 0,
+    minY: 0,
+    maxY: 0,
+  });
   const glowCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -121,6 +133,10 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       const imageData = offscreenContext.getImageData(0, 0, pixelWidth, pixelHeight);
       const { data } = imageData;
       const points: EdgePoint[] = [];
+      let minX = pixelWidth;
+      let maxX = 0;
+      let minY = pixelHeight;
+      let maxY = 0;
       const alphaAt = (x: number, y: number) => {
         if (x < 0 || y < 0 || x >= pixelWidth || y >= pixelHeight) {
           return 0;
@@ -134,6 +150,18 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
           if (alpha <= 20) {
             continue;
           }
+          if (x < minX) {
+            minX = x;
+          }
+          if (x > maxX) {
+            maxX = x;
+          }
+          if (y < minY) {
+            minY = y;
+          }
+          if (y > maxY) {
+            maxY = y;
+          }
           if (
             alphaAt(x - 1, y) === 0 ||
             alphaAt(x + 1, y) === 0 ||
@@ -146,6 +174,31 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       }
 
       edgePointsRef.current = points;
+      if (points.length > 0 && minX <= maxX && minY <= maxY) {
+        const cssMinX = minX / currentPixelRatio;
+        const cssMaxX = maxX / currentPixelRatio;
+        const cssMinY = minY / currentPixelRatio;
+        const cssMaxY = maxY / currentPixelRatio;
+        edgeBoundsRef.current = { minX: cssMinX, maxX: cssMaxX, minY: cssMinY, maxY: cssMaxY };
+        const cornerW = (cssMaxX - cssMinX) * 0.22;
+        const cornerH = (cssMaxY - cssMinY) * 0.22;
+        const topLeft = points.filter(
+          (point) => point.x <= cssMinX + cornerW && point.y <= cssMinY + cornerH,
+        );
+        const topRight = points.filter(
+          (point) => point.x >= cssMaxX - cornerW && point.y <= cssMinY + cornerH,
+        );
+        const bottomLeft = points.filter(
+          (point) => point.x <= cssMinX + cornerW && point.y >= cssMaxY - cornerH,
+        );
+        const bottomRight = points.filter(
+          (point) => point.x >= cssMaxX - cornerW && point.y >= cssMaxY - cornerH,
+        );
+        cornerPoolsRef.current = { topLeft, topRight, bottomLeft, bottomRight };
+      } else {
+        cornerPoolsRef.current = { topLeft: [], topRight: [], bottomLeft: [], bottomRight: [] };
+        edgeBoundsRef.current = { minX: 0, maxX: size.width, minY: 0, maxY: size.height };
+      }
 
       glowCanvas.width = pixelWidth;
       glowCanvas.height = pixelHeight;
@@ -171,8 +224,9 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     });
     resizeObserver.observe(wrapper);
 
-    const spawnParticle = () => {
+    const spawnParticle = (forceGlint = false) => {
       const edgePoints = edgePointsRef.current;
+      const pools = cornerPoolsRef.current;
       const padding = randomBetween(EDGE_PADDING_MIN, EDGE_PADDING_MAX);
       let x = 0;
       let y = 0;
@@ -181,12 +235,22 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       const baseSpeed = randomBetween(3, 8);
 
       if (edgePoints.length > 0) {
-        const point = edgePoints[Math.floor(Math.random() * edgePoints.length)];
+        const poolOptions = [pools.topLeft, pools.topRight, pools.bottomLeft, pools.bottomRight].map(
+          (pool) => (pool.length > 0 ? pool : edgePoints),
+        );
+        const selectedPool = poolOptions[Math.floor(Math.random() * poolOptions.length)];
+        const point = selectedPool[Math.floor(Math.random() * selectedPool.length)];
         x = point.x;
         y = point.y;
-        const angle = randomBetween(0, Math.PI * 2);
-        vx = Math.cos(angle) * baseSpeed;
-        vy = Math.sin(angle) * baseSpeed;
+        const { minX, maxX, minY, maxY } = edgeBoundsRef.current;
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const length = Math.hypot(dx, dy) || 1;
+        const jitter = randomBetween(-1.2, 1.2);
+        vx = (dx / length) * baseSpeed + jitter;
+        vy = (dy / length) * baseSpeed + randomBetween(-1.2, 1.2);
       } else {
         const edge = Math.floor(Math.random() * 4);
         if (edge === 0) {
@@ -212,20 +276,21 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         }
       }
 
-      const baseAlpha = randomBetween(0.35, 0.75);
+      const isGlint = forceGlint || Math.random() < 0.13;
+      const baseAlpha = isGlint ? randomBetween(0.6, 0.95) : randomBetween(0.35, 0.75);
       return {
         x,
         y,
         vx,
         vy,
-        radius: randomBetween(1.1, 2.4),
+        radius: isGlint ? randomBetween(4, 6) : randomBetween(1.6, 3.4),
         baseAlpha,
         alpha: baseAlpha,
-        life: randomBetween(3.2, 6.2),
+        life: isGlint ? randomBetween(2.6, 4.4) : randomBetween(3.2, 6.2),
         age: 0,
-        streakLength: randomBetween(10, 22),
-        hasStreak: Math.random() < 0.35,
-        hasStar: Math.random() < 0.12,
+        streakLength: isGlint ? randomBetween(24, 40) : randomBetween(12, 22),
+        hasStreak: isGlint || Math.random() < 0.35,
+        hasStar: Math.random() < (isGlint ? 0.4 : 0.12),
         rotation: randomBetween(0, Math.PI * 2),
         rotationSpeed: randomBetween(-0.6, 0.6),
       } satisfies Particle;
@@ -298,11 +363,11 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     const drawStatic = () => {
       context.clearRect(0, 0, size.width, size.height);
       drawOutlineGlow(0);
-      particles = Array.from({ length: 4 }, spawnParticle);
+      particles = Array.from({ length: 4 }, () => spawnParticle(true));
       context.save();
       context.globalCompositeOperation = 'lighter';
       context.shadowColor = 'rgba(139,255,0,0.95)';
-      context.shadowBlur = 32;
+      context.shadowBlur = 42;
       particles.forEach((particle) => {
         particle.alpha = Math.max(0.08, particle.baseAlpha * 0.6);
         particle.hasStreak = false;
@@ -339,7 +404,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       context.save();
       context.globalCompositeOperation = 'lighter';
       context.shadowColor = 'rgba(139,255,0,0.95)';
-      context.shadowBlur = 32;
+      context.shadowBlur = 42;
       particles = particles.filter((particle) => {
         particle.age += delta;
         particle.x += particle.vx * delta;
@@ -402,16 +467,6 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       <canvas
         ref={canvasRef}
         className="absolute inset-0 z-20 pointer-events-none"
-        style={{
-          WebkitMaskImage: `url(${src})`,
-          WebkitMaskRepeat: 'no-repeat',
-          WebkitMaskPosition: 'center',
-          WebkitMaskSize: 'contain',
-          maskImage: `url(${src})`,
-          maskRepeat: 'no-repeat',
-          maskPosition: 'center',
-          maskSize: 'contain',
-        }}
         aria-hidden="true"
       />
     </div>
