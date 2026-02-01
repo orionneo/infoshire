@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const MAX_PARTICLES = 60;
+const MAX_PARTICLES = 110;
 const EDGE_PADDING_MIN = 8;
 const EDGE_PADDING_MAX = 18;
 
@@ -29,9 +29,17 @@ type Particle = {
   rotationSpeed: number;
 };
 
+type EdgePoint = {
+  x: number;
+  y: number;
+};
+
 export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: LogoEdgeSparklesProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const edgePointsRef = useRef<EdgePoint[]>([]);
+  const glowCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
@@ -63,26 +71,108 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     let animationFrame = 0;
     let lastTime = 0;
     let particles: Particle[] = [];
+    let spawnAccumulator = 0;
+    let lastGlowDraw = 0;
+    let currentPixelRatio = window.devicePixelRatio || 1;
+    let currentSize = { width: 0, height: 0 };
 
     const resizeCanvas = () => {
       const { width, height } = wrapper.getBoundingClientRect();
       const pixelRatio = window.devicePixelRatio || 1;
+      currentPixelRatio = pixelRatio;
       canvas.width = Math.max(1, Math.floor(width * pixelRatio));
       canvas.height = Math.max(1, Math.floor(height * pixelRatio));
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      currentSize = { width, height };
       return { width, height };
     };
 
     let size = resizeCanvas();
+    const offscreenCanvas = document.createElement('canvas');
+    const offscreenContext = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+    const glowCanvas = document.createElement('canvas');
+    const glowContext = glowCanvas.getContext('2d');
+    glowCanvasRef.current = glowCanvas;
+
+    const updateEdgePoints = () => {
+      if (!offscreenContext || !glowContext) {
+        return;
+      }
+      const image = imageRef.current;
+      if (!image || !image.complete) {
+        return;
+      }
+
+      const { width, height } = currentSize;
+      if (width <= 0 || height <= 0) {
+        return;
+      }
+
+      const pixelWidth = Math.max(1, Math.floor(width * currentPixelRatio));
+      const pixelHeight = Math.max(1, Math.floor(height * currentPixelRatio));
+      offscreenCanvas.width = pixelWidth;
+      offscreenCanvas.height = pixelHeight;
+      offscreenContext.setTransform(1, 0, 0, 1, 0, 0);
+      offscreenContext.clearRect(0, 0, pixelWidth, pixelHeight);
+      offscreenContext.drawImage(image, 0, 0, pixelWidth, pixelHeight);
+
+      const imageData = offscreenContext.getImageData(0, 0, pixelWidth, pixelHeight);
+      const { data } = imageData;
+      const points: EdgePoint[] = [];
+      const alphaAt = (x: number, y: number) => {
+        if (x < 0 || y < 0 || x >= pixelWidth || y >= pixelHeight) {
+          return 0;
+        }
+        return data[(y * pixelWidth + x) * 4 + 3];
+      };
+
+      for (let y = 0; y < pixelHeight; y += 1) {
+        for (let x = 0; x < pixelWidth; x += 1) {
+          const alpha = alphaAt(x, y);
+          if (alpha <= 20) {
+            continue;
+          }
+          if (
+            alphaAt(x - 1, y) === 0 ||
+            alphaAt(x + 1, y) === 0 ||
+            alphaAt(x, y - 1) === 0 ||
+            alphaAt(x, y + 1) === 0
+          ) {
+            points.push({ x: x / currentPixelRatio, y: y / currentPixelRatio });
+          }
+        }
+      }
+
+      edgePointsRef.current = points;
+
+      glowCanvas.width = pixelWidth;
+      glowCanvas.height = pixelHeight;
+      glowContext.setTransform(1, 0, 0, 1, 0, 0);
+      glowContext.clearRect(0, 0, pixelWidth, pixelHeight);
+      glowContext.drawImage(image, 0, 0, pixelWidth, pixelHeight);
+    };
+
+    const ensureImage = () => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = src;
+      img.onload = () => {
+        updateEdgePoints();
+      };
+      imageRef.current = img;
+    };
+
+    ensureImage();
     const resizeObserver = new ResizeObserver(() => {
       size = resizeCanvas();
+      updateEdgePoints();
     });
     resizeObserver.observe(wrapper);
 
     const spawnParticle = () => {
-      const edge = Math.floor(Math.random() * 4);
+      const edgePoints = edgePointsRef.current;
       const padding = randomBetween(EDGE_PADDING_MIN, EDGE_PADDING_MAX);
       let x = 0;
       let y = 0;
@@ -90,26 +180,36 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       let vy = 0;
       const baseSpeed = randomBetween(3, 8);
 
-      if (edge === 0) {
-        x = randomBetween(padding, size.width - padding);
-        y = padding;
-        vx = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
-        vy = randomBetween(-1.5, 1.5);
-      } else if (edge === 1) {
-        x = size.width - padding;
-        y = randomBetween(padding, size.height - padding);
-        vx = randomBetween(-1.5, 1.5);
-        vy = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
-      } else if (edge === 2) {
-        x = randomBetween(padding, size.width - padding);
-        y = size.height - padding;
-        vx = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
-        vy = randomBetween(-1.5, 1.5);
+      if (edgePoints.length > 0) {
+        const point = edgePoints[Math.floor(Math.random() * edgePoints.length)];
+        x = point.x;
+        y = point.y;
+        const angle = randomBetween(0, Math.PI * 2);
+        vx = Math.cos(angle) * baseSpeed;
+        vy = Math.sin(angle) * baseSpeed;
       } else {
-        x = padding;
-        y = randomBetween(padding, size.height - padding);
-        vx = randomBetween(-1.5, 1.5);
-        vy = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
+        const edge = Math.floor(Math.random() * 4);
+        if (edge === 0) {
+          x = randomBetween(padding, size.width - padding);
+          y = padding;
+          vx = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
+          vy = randomBetween(-1.5, 1.5);
+        } else if (edge === 1) {
+          x = size.width - padding;
+          y = randomBetween(padding, size.height - padding);
+          vx = randomBetween(-1.5, 1.5);
+          vy = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
+        } else if (edge === 2) {
+          x = randomBetween(padding, size.width - padding);
+          y = size.height - padding;
+          vx = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
+          vy = randomBetween(-1.5, 1.5);
+        } else {
+          x = padding;
+          y = randomBetween(padding, size.height - padding);
+          vx = randomBetween(-1.5, 1.5);
+          vy = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
+        }
       }
 
       const baseAlpha = randomBetween(0.35, 0.75);
@@ -152,6 +252,11 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
 
     const drawParticle = (particle: Particle) => {
       context.beginPath();
+      context.arc(particle.x, particle.y, particle.radius * 1.9, 0, Math.PI * 2);
+      context.fillStyle = `rgba(139,255,0,${particle.alpha * 0.35})`;
+      context.fill();
+
+      context.beginPath();
       context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
       context.fillStyle = `rgba(255,255,255,${particle.alpha})`;
       context.fill();
@@ -173,13 +278,31 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       }
     };
 
-    const drawStatic = () => {
-      context.clearRect(0, 0, size.width, size.height);
-      particles = Array.from({ length: 3 }, spawnParticle);
+    const drawOutlineGlow = (time: number) => {
+      if (time - lastGlowDraw < 120 && lastGlowDraw !== 0) {
+        return;
+      }
+      lastGlowDraw = time;
+      if (!glowCanvasRef.current) {
+        return;
+      }
       context.save();
       context.globalCompositeOperation = 'lighter';
-      context.shadowColor = 'rgba(255,255,255,0.9)';
-      context.shadowBlur = 14;
+      context.globalAlpha = 0.22;
+      context.shadowColor = 'rgba(139,255,0,0.75)';
+      context.shadowBlur = 22;
+      context.drawImage(glowCanvasRef.current, 0, 0, size.width, size.height);
+      context.restore();
+    };
+
+    const drawStatic = () => {
+      context.clearRect(0, 0, size.width, size.height);
+      drawOutlineGlow(0);
+      particles = Array.from({ length: 4 }, spawnParticle);
+      context.save();
+      context.globalCompositeOperation = 'lighter';
+      context.shadowColor = 'rgba(139,255,0,0.95)';
+      context.shadowBlur = 32;
       particles.forEach((particle) => {
         particle.alpha = Math.max(0.08, particle.baseAlpha * 0.6);
         particle.hasStreak = false;
@@ -200,14 +323,23 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
 
       context.clearRect(0, 0, size.width, size.height);
 
-      if (particles.length < MAX_PARTICLES) {
-        particles.push(spawnParticle());
+      drawOutlineGlow(time);
+
+      const spawnRate = 70;
+      spawnAccumulator += delta * spawnRate;
+      const availableSlots = MAX_PARTICLES - particles.length;
+      const spawnCount = Math.min(Math.floor(spawnAccumulator), availableSlots, 4);
+      if (spawnCount > 0) {
+        spawnAccumulator -= spawnCount;
+        for (let i = 0; i < spawnCount; i += 1) {
+          particles.push(spawnParticle());
+        }
       }
 
       context.save();
       context.globalCompositeOperation = 'lighter';
-      context.shadowColor = 'rgba(255,255,255,0.9)';
-      context.shadowBlur = 14;
+      context.shadowColor = 'rgba(139,255,0,0.95)';
+      context.shadowBlur = 32;
       particles = particles.filter((particle) => {
         particle.age += delta;
         particle.x += particle.vx * delta;
@@ -254,7 +386,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       resizeObserver.disconnect();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [prefersReducedMotion]);
+  }, [prefersReducedMotion, src]);
 
   return (
     <div
