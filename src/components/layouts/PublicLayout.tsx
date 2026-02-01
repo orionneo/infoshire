@@ -30,7 +30,14 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
       }
 
       const target = event.target as HTMLElement | null;
+      const triggerButton = target?.closest('[data-whatsapp-trigger]') as HTMLElement | null;
       const anchor = target?.closest('a[href]') as HTMLAnchorElement | null;
+
+      if (triggerButton) {
+        event.preventDefault();
+        setBudgetModalOpen(true);
+        return;
+      }
 
       if (!anchor) {
         return;
@@ -92,8 +99,6 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
     },
   ];
 
-  const whatsappUrl = 'https://wa.me/5519993352727?text=Olá,%20quero%20um%20orçamento%20rápido';
-
   return (
     <div className="flex min-h-screen flex-col">
       {/* Content Wrapper - Garante que todo conteúdo fique acima do background */}
@@ -149,16 +154,10 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             <Button
               size="sm"
               className="btn-premium rounded-full h-10 px-6 bg-gradient-to-r from-primary to-primary/90 text-black font-semibold"
-              asChild
+              data-whatsapp-trigger
             >
-              <a
-                href="https://wa.me/5519997744247?text=Olá!%20Gostaria%20de%20solicitar%20um%20orçamento."
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <MessageCircle className="h-4 w-4 mr-2" />
-                WhatsApp
-              </a>
+              <MessageCircle className="h-4 w-4 mr-2" />
+              WhatsApp
             </Button>
             
             {user ? (
@@ -263,17 +262,15 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div className="xl:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-primary/20 bg-black/90 backdrop-blur-md">
-        <div className="container px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3">
+        <div className="container px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2">
           <div className="grid grid-cols-2 gap-3">
             <Button
               size="lg"
               className="h-14 bg-primary text-black hover:bg-primary/90 font-semibold"
-              asChild
+              data-whatsapp-trigger
             >
-              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                <MessageCircle className="mr-2 h-5 w-5" />
-                WhatsApp
-              </a>
+              <MessageCircle className="mr-2 h-5 w-5" />
+              WhatsApp
             </Button>
             <BudgetWhatsAppModal
               open={budgetModalOpen}
@@ -291,7 +288,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </div>
-      <div className="xl:hidden h-[88px]" />
+      <div className="xl:hidden h-[calc(72px+env(safe-area-inset-bottom))]" />
       {/* Main Content */}
       <main className="flex-1">{children}</main>
       {/* Footer */}

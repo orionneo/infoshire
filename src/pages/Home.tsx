@@ -1,5 +1,5 @@
 import { Activity, ChevronLeft, ChevronRight, ClipboardList, Clock, Gamepad2, Laptop, MessageSquare, Microscope, Monitor, Package, Shield, ShieldCheck, Truck, Wrench } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BudgetWhatsAppModal } from '@/components/BudgetWhatsAppModal';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
@@ -11,6 +11,13 @@ import logoInfoshire from '@/assets/images/logo-infoshire.png';
 import serviceNotebooks from '@/assets/images/service-notebooks.jpg';
 import serviceVideogames from '@/assets/images/service-videogames.jpg';
 import serviceElectronics from '@/assets/images/service-electronics.jpg';
+
+type ProcessStep = {
+  title: string;
+  description: React.ReactNode;
+  icon: React.ElementType;
+  highlight?: boolean;
+};
 
 export default function Home() {
   const navigate = useNavigate();
@@ -71,12 +78,7 @@ export default function Home() {
     },
   ];
 
-  const processSteps: {
-    title: string;
-    description: React.ReactNode;
-    icon: React.ElementType;
-    highlight?: boolean;
-  }[] = [
+  const processSteps: ProcessStep[] = [
     {
       title: 'Pedido de Orçamento',
       description: 'Cliente solicita orçamento pelo site ou WhatsApp.',
@@ -129,13 +131,15 @@ export default function Home() {
             <div className="mb-12 flex justify-center animate-fade-in-up">
               <div className="w-full max-w-lg xl:max-w-3xl relative px-4">
                 <div className="absolute inset-0 bg-primary/20 blur-3xl animate-pulse"></div>
-                <div className="logo-electric">
-                  <span className="logo-electric__sweep" aria-hidden="true" />
-                  <img
-                    src={logoInfoshire}
-                    alt="InfoShire - Games e Informática"
-                    className="logo-electric__image w-full h-auto object-contain drop-shadow-[0_0_25px_rgba(139,255,0,0.9)] animate-float"
-                  />
+                <div className="logo-sparkle-wrap">
+                  <div className="logo-electric">
+                    <span className="logo-electric__sweep" aria-hidden="true" />
+                    <img
+                      src={logoInfoshire}
+                      alt="InfoShire - Games e Informática"
+                      className="logo-electric__image w-full h-auto object-contain drop-shadow-[0_0_25px_rgba(139,255,0,0.9)] animate-float"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -311,38 +315,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {processSteps.map((step) => {
-              const Icon = step.icon;
-              return (
-                <Card
-                  key={step.title}
-                  className={`bg-card/50 backdrop-blur border-border hover:border-primary/60 transition-all duration-300 hover-lift ${
-                    step.highlight ? 'border-2 border-primary/60 shadow-lg shadow-primary/20' : ''
-                  }`}
-                >
-                  <CardContent className="p-6 flex flex-col gap-4">
-                    <div className="flex items-start justify-between">
-                      <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
-                        <Icon className="h-7 w-7 text-primary" />
-                      </div>
-                      {step.highlight && (
-                        <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
-                          Diferencial InfoShire
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {step.description}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <ProcessFlow steps={processSteps} />
 
           <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
             <BudgetWhatsAppModal
@@ -477,6 +450,191 @@ export default function Home() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchDeltaX = useRef(0);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
+    handleChange();
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setCurrentStep((prev) => (prev + 1) % steps.length);
+    }, 4000);
+
+    return () => window.clearInterval(intervalId);
+  }, [prefersReducedMotion, steps.length]);
+
+  const goToStep = (index: number) => {
+    setCurrentStep((index + steps.length) % steps.length);
+  };
+
+  const handlePrev = () => goToStep(currentStep - 1);
+  const handleNext = () => goToStep(currentStep + 1);
+
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+    touchDeltaX.current = 0;
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartX.current === null) {
+      return;
+    }
+    touchDeltaX.current = event.touches[0].clientX - touchStartX.current;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current === null) {
+      return;
+    }
+    if (touchDeltaX.current > 40) {
+      handlePrev();
+    } else if (touchDeltaX.current < -40) {
+      handleNext();
+    }
+    touchStartX.current = null;
+    touchDeltaX.current = 0;
+  };
+
+  const activeStep = steps[currentStep];
+  const nextStep = steps[(currentStep + 1) % steps.length];
+  const ActiveIcon = activeStep.icon;
+
+  return (
+    <div className="space-y-10">
+      <div className="md:hidden space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={handlePrev}
+            className="h-10 w-10 border-primary/40 text-primary hover:border-primary hover:bg-primary/10"
+            aria-label="Etapa anterior"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            {steps.map((_, index) => (
+              <button
+                key={`step-dot-${index}`}
+                type="button"
+                onClick={() => goToStep(index)}
+                className={`h-2.5 w-2.5 rounded-full transition-all ${
+                  index === currentStep ? 'bg-primary shadow-[0_0_10px_rgba(139,255,0,0.6)]' : 'bg-primary/30'
+                }`}
+                aria-label={`Ir para etapa ${index + 1}`}
+                aria-current={index === currentStep ? 'step' : undefined}
+              />
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={handleNext}
+            className="h-10 w-10 border-primary/40 text-primary hover:border-primary hover:bg-primary/10"
+            aria-label="Próxima etapa"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <div
+          className="space-y-4"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <Card className="bg-card/60 backdrop-blur border-primary/40 shadow-[0_0_25px_rgba(139,255,0,0.18)]">
+            <CardContent className="p-6 flex flex-col gap-4">
+              <div className="flex items-start justify-between">
+                <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
+                  <ActiveIcon className="h-7 w-7 text-primary" />
+                </div>
+                {activeStep.highlight && (
+                  <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
+                    Diferencial InfoShire
+                  </span>
+                )}
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">{activeStep.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {activeStep.description}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="rounded-2xl border border-primary/20 bg-card/40 px-5 py-4 text-sm text-muted-foreground">
+            <span className="text-xs uppercase tracking-wide text-primary/70">Próxima etapa</span>
+            <p className="mt-2 font-semibold text-foreground">{nextStep.title}</p>
+            <p className="text-xs mt-1">{nextStep.description}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden md:grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          const isActive = index === currentStep;
+          return (
+            <Card
+              key={step.title}
+              className={`bg-card/50 backdrop-blur border-border transition-all duration-300 hover-lift ${
+                isActive ? 'border-primary/70 shadow-lg shadow-primary/30 scale-[1.02]' : 'hover:border-primary/60'
+              }`}
+            >
+              <CardContent className="p-6 flex flex-col gap-4">
+                <div className="flex items-start justify-between">
+                  <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
+                    <Icon className="h-7 w-7 text-primary" />
+                  </div>
+                  {step.highlight && (
+                    <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
+                      Diferencial InfoShire
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {step.description}
+                  </p>
+                </div>
+                {isActive && (
+                  <div className="mt-2 text-xs uppercase tracking-wide text-primary">
+                    Em destaque agora
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
