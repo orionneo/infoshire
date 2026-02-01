@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const MAX_PARTICLES = 32;
+const MAX_PARTICLES = 60;
 const EDGE_PADDING_MIN = 8;
 const EDGE_PADDING_MAX = 18;
 
@@ -18,6 +18,7 @@ type Particle = {
   vx: number;
   vy: number;
   radius: number;
+  baseAlpha: number;
   alpha: number;
   life: number;
   age: number;
@@ -111,16 +112,18 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         vy = Math.random() < 0.5 ? baseSpeed : -baseSpeed;
       }
 
+      const baseAlpha = randomBetween(0.35, 0.75);
       return {
         x,
         y,
         vx,
         vy,
-        radius: randomBetween(0.6, 1.6),
-        alpha: randomBetween(0.08, 0.22),
+        radius: randomBetween(1.1, 2.4),
+        baseAlpha,
+        alpha: baseAlpha,
         life: randomBetween(3.2, 6.2),
         age: 0,
-        streakLength: randomBetween(8, 18),
+        streakLength: randomBetween(10, 22),
         hasStreak: Math.random() < 0.35,
         hasStar: Math.random() < 0.12,
         rotation: randomBetween(0, Math.PI * 2),
@@ -154,8 +157,8 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       context.fill();
 
       if (particle.hasStreak) {
-        context.strokeStyle = `rgba(255,255,255,${particle.alpha * 0.35})`;
-        context.lineWidth = 0.8;
+        context.strokeStyle = `rgba(255,255,255,${particle.alpha * 0.5})`;
+        context.lineWidth = 0.95;
         context.beginPath();
         context.moveTo(particle.x, particle.y);
         context.lineTo(
@@ -173,12 +176,17 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     const drawStatic = () => {
       context.clearRect(0, 0, size.width, size.height);
       particles = Array.from({ length: 3 }, spawnParticle);
+      context.save();
+      context.globalCompositeOperation = 'lighter';
+      context.shadowColor = 'rgba(255,255,255,0.9)';
+      context.shadowBlur = 14;
       particles.forEach((particle) => {
-        particle.alpha *= 0.6;
+        particle.alpha = Math.max(0.08, particle.baseAlpha * 0.6);
         particle.hasStreak = false;
         particle.hasStar = Math.random() < 0.5;
         drawParticle(particle);
       });
+      context.restore();
     };
 
     const animate = (time: number) => {
@@ -196,6 +204,10 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         particles.push(spawnParticle());
       }
 
+      context.save();
+      context.globalCompositeOperation = 'lighter';
+      context.shadowColor = 'rgba(255,255,255,0.9)';
+      context.shadowBlur = 14;
       particles = particles.filter((particle) => {
         particle.age += delta;
         particle.x += particle.vx * delta;
@@ -204,11 +216,12 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
 
         const lifeProgress = particle.age / particle.life;
         const fade = Math.sin(Math.min(lifeProgress, 1) * Math.PI);
-        particle.alpha = Math.max(0.04, particle.alpha * fade);
+        particle.alpha = Math.max(0.08, particle.baseAlpha * fade);
 
         drawParticle(particle);
         return particle.age < particle.life;
       });
+      context.restore();
 
       animationFrame = requestAnimationFrame(animate);
     };
@@ -251,11 +264,12 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       <img
         src={src}
         alt={alt}
-        className="w-full h-auto object-contain"
+        className="relative z-10 w-full h-auto object-contain"
         loading="lazy"
       />
-      <div
-        className="absolute inset-0 pointer-events-none"
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 z-20 pointer-events-none"
         style={{
           WebkitMaskImage: `url(${src})`,
           WebkitMaskRepeat: 'no-repeat',
@@ -267,9 +281,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
           maskSize: 'contain',
         }}
         aria-hidden="true"
-      >
-        <canvas ref={canvasRef} className="h-full w-full" />
-      </div>
+      />
     </div>
   );
 }
