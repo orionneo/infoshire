@@ -25,10 +25,12 @@ export function ActionBar() {
           <Button
             size="lg"
             className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold flex flex-col items-center justify-center h-16 gap-1"
-            onClick={() => window.open(whatsappUrl, '_blank')}
+            asChild
           >
-            <MessageCircle className="h-5 w-5" />
-            <span className="text-xs">WhatsApp</span>
+            <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="h-5 w-5" />
+              <span className="text-xs">WhatsApp</span>
+            </a>
           </Button>
           <Button
             size="lg"

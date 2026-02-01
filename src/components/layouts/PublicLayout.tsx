@@ -16,10 +16,41 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchEnabled, setSearchEnabled] = useState(false);
+  const [budgetModalOpen, setBudgetModalOpen] = useState(false);
 
   useEffect(() => {
     // Carregar configuração de busca
     getSearchEnabled().then(setSearchEnabled).catch(() => setSearchEnabled(false));
+  }, []);
+
+  useEffect(() => {
+    const handleWhatsAppClick = (event: MouseEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest('a[href]') as HTMLAnchorElement | null;
+
+      if (!anchor) {
+        return;
+      }
+
+      const href = anchor.getAttribute('href') ?? '';
+      const isWhatsAppLink = href.includes('wa.me') || href.includes('api.whatsapp.com');
+
+      if (!isWhatsAppLink) {
+        return;
+      }
+
+      event.preventDefault();
+      setBudgetModalOpen(true);
+    };
+
+    document.addEventListener('click', handleWhatsAppClick);
+    return () => {
+      document.removeEventListener('click', handleWhatsAppClick);
+    };
   }, []);
 
   const handleSignOut = async () => {
@@ -118,10 +149,16 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             <Button
               size="sm"
               className="btn-premium rounded-full h-10 px-6 bg-gradient-to-r from-primary to-primary/90 text-black font-semibold"
-              onClick={() => window.open('https://wa.me/5519997744247?text=Olá!%20Gostaria%20de%20solicitar%20um%20orçamento.', '_blank')}
+              asChild
             >
-              <MessageCircle className="h-4 w-4 mr-2" />
-              WhatsApp
+              <a
+                href="https://wa.me/5519997744247?text=Olá!%20Gostaria%20de%20solicitar%20um%20orçamento."
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MessageCircle className="h-4 w-4 mr-2" />
+                WhatsApp
+              </a>
             </Button>
             
             {user ? (
@@ -231,12 +268,16 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             <Button
               size="lg"
               className="h-14 bg-primary text-black hover:bg-primary/90 font-semibold"
-              onClick={() => window.open(whatsappUrl, '_blank')}
+              asChild
             >
-              <MessageCircle className="mr-2 h-5 w-5" />
-              WhatsApp
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="mr-2 h-5 w-5" />
+                WhatsApp
+              </a>
             </Button>
             <BudgetWhatsAppModal
+              open={budgetModalOpen}
+              onOpenChange={setBudgetModalOpen}
               trigger={(
                 <Button
                   size="lg"
