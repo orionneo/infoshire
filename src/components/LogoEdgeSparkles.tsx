@@ -21,7 +21,11 @@ type EdgePoint = {
 export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: LogoEdgeSparklesProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const contourRef = useRef<EdgePoint[]>([]);
+  const contourRef = useRef<{ outer: EdgePoint[]; mid: EdgePoint[]; inner: EdgePoint[] }>({
+    outer: [],
+    mid: [],
+    inner: [],
+  });
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -131,7 +135,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     };
 
     function drawReducedMotion() {
-      const contour = contourRef.current;
+      const contour = contourRef.current.mid;
       ctx.clearRect(0, 0, drawSize.width, drawSize.height);
       if (contour.length === 0) {
         return;
@@ -206,7 +210,8 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     }
 
     function drawTracer(time: number) {
-      const contour = contourRef.current;
+      const { outer, mid, inner } = contourRef.current;
+      const contour = outer;
       if (contour.length < 2) {
         return;
       }
@@ -225,7 +230,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       const offsetY = BLEED;
 
       drawTailLayer(
-        contour,
+        outer,
         head,
         tailLen,
         offsetX,
@@ -237,7 +242,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         { r: 139, g: 255, b: 0 },
       );
       drawTailLayer(
-        contour,
+        mid,
         head,
         tailLen,
         offsetX,
@@ -249,7 +254,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         { r: 139, g: 255, b: 0 },
       );
       drawTailLayer(
-        contour,
+        inner,
         head,
         tailLen,
         offsetX,
@@ -301,17 +306,84 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       offscreenCanvas.height = pixelHeight;
       offscreenContext.setTransform(1, 0, 0, 1, 0, 0);
       offscreenContext.clearRect(0, 0, pixelWidth, pixelHeight);
-      offscreenContext.filter = 'blur(2px)';
       offscreenContext.drawImage(image, 0, 0, pixelWidth, pixelHeight);
-      offscreenContext.filter = 'none';
 
       const imageData = offscreenContext.getImageData(0, 0, pixelWidth, pixelHeight);
       const { data } = imageData;
       const totalPixels = pixelWidth * pixelHeight;
-      const solid = new Uint8Array(totalPixels);
+      const baseMask = new Uint8Array(totalPixels);
       for (let i = 0; i < totalPixels; i += 1) {
-        solid[i] = data[i * 4 + 3] > 20 ? 1 : 0;
+        const offset = i * 4;
+        const r = data[offset];
+        const g = data[offset + 1];
+        const b = data[offset + 2];
+        const a = data[offset + 3];
+        const foreground = a > 20 || r < 248 || g < 248 || b < 248;
+        baseMask[i] = foreground ? 1 : 0;
       }
+
+      const buildOffsets = (radius: number) => {
+        const offsets: Array<{ dx: number; dy: number }> = [];
+        const r2 = radius * radius;
+        for (let dy = -radius; dy <= radius; dy += 1) {
+          for (let dx = -radius; dx <= radius; dx += 1) {
+            if (dx * dx + dy * dy <= r2) {
+              offsets.push({ dx, dy });
+            }
+          }
+        }
+        return offsets;
+      };
+
+      const applyDilation = (mask: Uint8Array, radius: number) => {
+        const offsets = buildOffsets(radius);
+        const next = new Uint8Array(mask.length);
+        for (let y = 0; y < pixelHeight; y += 1) {
+          for (let x = 0; x < pixelWidth; x += 1) {
+            let solid = 0;
+            for (const { dx, dy } of offsets) {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= pixelWidth || ny >= pixelHeight) {
+                continue;
+              }
+              if (mask[ny * pixelWidth + nx] === 1) {
+                solid = 1;
+                break;
+              }
+            }
+            next[y * pixelWidth + x] = solid;
+          }
+        }
+        return next;
+      };
+
+      const applyErosion = (mask: Uint8Array, radius: number) => {
+        const offsets = buildOffsets(radius);
+        const next = new Uint8Array(mask.length);
+        for (let y = 0; y < pixelHeight; y += 1) {
+          for (let x = 0; x < pixelWidth; x += 1) {
+            let solid = 1;
+            for (const { dx, dy } of offsets) {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= pixelWidth || ny >= pixelHeight) {
+                solid = 0;
+                break;
+              }
+              if (mask[ny * pixelWidth + nx] === 0) {
+                solid = 0;
+                break;
+              }
+            }
+            next[y * pixelWidth + x] = solid;
+          }
+        }
+        return next;
+      };
+
+      const morphRadius = 7;
+      const solid = applyErosion(applyDilation(baseMask, morphRadius), morphRadius);
 
       const outside = new Uint8Array(totalPixels);
       const queue: number[] = [];
@@ -375,9 +447,8 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         { x: 1, y: -1 },
       ];
 
-      const traceContour = (start: EdgePoint, visited: Uint8Array) => {
+      const traceContour = (start: EdgePoint) => {
         const contourPixels: EdgePoint[] = [{ ...start }];
-        visited[start.y * pixelWidth + start.x] = 1;
         let current = { ...start };
         let dir = 0;
         const maxSteps = totalPixels * 2;
@@ -393,7 +464,6 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
             if (edgeMask[ny * pixelWidth + nx] === 1) {
               current = { x: nx, y: ny };
               contourPixels.push(current);
-              visited[ny * pixelWidth + nx] = 1;
               dir = nextDir;
               found = true;
               break;
@@ -409,91 +479,24 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         return contourPixels;
       };
 
-      const visited = new Uint8Array(totalPixels);
-      const contours: EdgePoint[][] = [];
+      let startPixel: EdgePoint | null = null;
       for (let y = 0; y < pixelHeight; y += 1) {
         for (let x = 0; x < pixelWidth; x += 1) {
           const index = y * pixelWidth + x;
-          if (edgeMask[index] === 1 && visited[index] === 0) {
-            contours.push(traceContour({ x, y }, visited));
+          if (edgeMask[index] === 1) {
+            startPixel = { x, y };
+            break;
           }
         }
-      }
-
-      const bboxArea = (pts: EdgePoint[]) => {
-        let minX = Infinity,
-          minY = Infinity,
-          maxX = -Infinity,
-          maxY = -Infinity;
-        for (const p of pts) {
-          if (p.x < minX) minX = p.x;
-          if (p.y < minY) minY = p.y;
-          if (p.x > maxX) maxX = p.x;
-          if (p.y > maxY) maxY = p.y;
-        }
-        const w = Math.max(0, maxX - minX);
-        const h = Math.max(0, maxY - minY);
-        return { area: w * h, minX, minY, maxX, maxY };
-      };
-
-      const polygonAreaAbs = (pts: EdgePoint[]) => {
-        if (pts.length < 3) return 0;
-        let sum = 0;
-        for (let i = 0; i < pts.length; i += 1) {
-          const a = pts[i];
-          const b = pts[(i + 1) % pts.length];
-          sum += a.x * b.y - b.x * a.y;
-        }
-        return Math.abs(sum) * 0.5;
-      };
-
-      const imageBox = { w: pixelWidth, h: pixelHeight, area: pixelWidth * pixelHeight };
-
-      let best: EdgePoint[] = [];
-      let bestScore = -1;
-      let bestBboxArea = -1;
-      let bestLen = -1;
-
-      for (const c of contours) {
-        if (c.length < 8) continue;
-        const bb = bboxArea(c);
-        const poly = polygonAreaAbs(c);
-        const score = bb.area * 0.85 + poly * 0.15;
-
-        if (
-          score > bestScore ||
-          (score === bestScore && bb.area > bestBboxArea) ||
-          (score === bestScore && bb.area === bestBboxArea && c.length > bestLen)
-        ) {
-          best = c;
-          bestScore = score;
-          bestBboxArea = bb.area;
-          bestLen = c.length;
+        if (startPixel) {
+          break;
         }
       }
 
-      // Guard: if best bbox is suspiciously small, still keep the largest bbox contour
-      if (best.length > 0) {
-        const bb = bboxArea(best);
-        const minAccept = imageBox.area * 0.2;
-        if (bb.area < minAccept) {
-          let fallback: EdgePoint[] = best;
-          let fallbackArea = bb.area;
-          for (const c of contours) {
-            const a = bboxArea(c).area;
-            if (a > fallbackArea) {
-              fallback = c;
-              fallbackArea = a;
-            }
-          }
-          best = fallback;
-        }
-      }
-
-      const contourPixels = best;
+      const contourPixels = startPixel ? traceContour(startPixel) : [];
 
       if (contourPixels.length === 0) {
-        contourRef.current = [];
+        contourRef.current = { outer: [], mid: [], inner: [] };
         return;
       }
 
@@ -502,7 +505,59 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         y: point.y / currentPixelRatio,
       }));
       const resampled = resamplePath(contourCss, SPACING_PX);
-      contourRef.current = smoothPath(resampled, SMOOTH_WINDOW);
+      const smoothed = smoothPath(resampled, SMOOTH_WINDOW);
+
+      const signedArea = (pts: EdgePoint[]) => {
+        if (pts.length < 3) return 0;
+        let sum = 0;
+        for (let i = 0; i < pts.length; i += 1) {
+          const a = pts[i];
+          const b = pts[(i + 1) % pts.length];
+          sum += a.x * b.y - b.x * a.y;
+        }
+        return sum * 0.5;
+      };
+
+      const offsetContour = (pts: EdgePoint[], distance: number) => {
+        if (pts.length === 0) {
+          return pts;
+        }
+        const area = signedArea(pts);
+        if (area === 0) {
+          return pts.map((p) => ({ ...p }));
+        }
+        const orientation = Math.sign(area);
+        const length = pts.length;
+        return pts.map((point, index) => {
+          const prev = pts[(index - 1 + length) % length];
+          const next = pts[(index + 1) % length];
+          const dx = next.x - prev.x;
+          const dy = next.y - prev.y;
+          const tangentLength = Math.hypot(dx, dy);
+          if (tangentLength < 0.001) {
+            return { ...point };
+          }
+          let nx = 0;
+          let ny = 0;
+          if (orientation > 0) {
+            nx = dy / tangentLength;
+            ny = -dx / tangentLength;
+          } else {
+            nx = -dy / tangentLength;
+            ny = dx / tangentLength;
+          }
+          return {
+            x: point.x + nx * distance,
+            y: point.y + ny * distance,
+          };
+        });
+      };
+
+      contourRef.current = {
+        outer: offsetContour(smoothed, 10),
+        mid: offsetContour(smoothed, 5),
+        inner: offsetContour(smoothed, 2),
+      };
       ctx.clearRect(0, 0, drawSize.width, drawSize.height);
       if (prefersReducedMotion) {
         drawReducedMotion();
