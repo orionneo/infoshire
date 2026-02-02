@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 
 const BLEED = 64;
 const DURATION_MS = 5400;
-const FADE_ALPHA = 0.085;
-const TAIL_RATIO = 0.18;
-const SPACING_PX = 2;
-const SMOOTH_WINDOW = 7;
+const FADE_ALPHA = 0.14;
+const TAIL_RATIO = 0.06;
+const SPACING_PX = 4;
+const SMOOTH_WINDOW = 5;
 
 type LogoEdgeSparklesProps = {
   src: string;
@@ -59,6 +59,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     let animationFrame = 0;
     let currentPixelRatio = window.devicePixelRatio || 1;
     let currentSize = { width: 0, height: 0 };
+    let lastDrawTime = 0;
 
     let drawSize = { width: 0, height: 0 };
     const resizeCanvas = () => {
@@ -135,19 +136,19 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     };
 
     function drawReducedMotion() {
-      const contour = contourRef.current.mid;
+      const contour = contourRef.current.outer;
       ctx.clearRect(0, 0, drawSize.width, drawSize.height);
       if (contour.length === 0) {
         return;
       }
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.shadowColor = 'rgba(139,255,0,0.35)';
-      ctx.shadowBlur = 18;
-      ctx.lineWidth = 3.5;
+      ctx.shadowColor = 'rgba(139,255,0,0.18)';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 3.2;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(139,255,0,0.2)';
+      ctx.strokeStyle = 'rgba(139,255,0,0.08)';
       const offsetX = BLEED;
       const offsetY = BLEED;
       ctx.beginPath();
@@ -162,10 +163,10 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       });
       ctx.closePath();
       ctx.stroke();
-      ctx.shadowColor = 'rgba(255,255,255,0.2)';
-      ctx.shadowBlur = 10;
+      ctx.shadowColor = 'rgba(255,255,255,0.35)';
+      ctx.shadowBlur = 6;
       ctx.lineWidth = 1.6;
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
       ctx.stroke();
       ctx.restore();
     }
@@ -210,8 +211,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     }
 
     function drawTracer(time: number) {
-      const { outer, mid, inner } = contourRef.current;
-      const contour = outer;
+      const contour = contourRef.current.outer;
       if (contour.length < 2) {
         return;
       }
@@ -223,46 +223,34 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       const t = (time % DURATION_MS) / DURATION_MS;
       const head = Math.floor(t * contour.length);
       const tailLen = Math.min(
-        contour.length - 1,
-        Math.max(30, Math.floor(contour.length * TAIL_RATIO)),
+        120,
+        Math.max(20, Math.floor(contour.length * TAIL_RATIO)),
       );
       const offsetX = BLEED;
       const offsetY = BLEED;
 
       drawTailLayer(
-        outer,
+        contour,
         head,
         tailLen,
         offsetX,
         offsetY,
-        9,
-        'rgba(139,255,0,0.85)',
-        30,
-        0.24,
-        { r: 139, g: 255, b: 0 },
-      );
-      drawTailLayer(
-        mid,
-        head,
-        tailLen,
-        offsetX,
-        offsetY,
-        5.5,
-        'rgba(139,255,0,0.65)',
-        16,
-        0.28,
-        { r: 139, g: 255, b: 0 },
-      );
-      drawTailLayer(
-        inner,
-        head,
-        tailLen,
-        offsetX,
-        offsetY,
-        2.1,
-        'rgba(255,255,255,0.55)',
+        3.2,
+        'rgba(139,255,0,0.18)',
         10,
-        0.42,
+        0.08,
+        { r: 139, g: 255, b: 0 },
+      );
+      drawTailLayer(
+        contour,
+        head,
+        tailLen,
+        offsetX,
+        offsetY,
+        1.6,
+        'rgba(255,255,255,0.35)',
+        6,
+        0.22,
         { r: 255, g: 255, b: 255 },
       );
 
@@ -270,17 +258,17 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       if (headPoint) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.shadowColor = 'rgba(139,255,0,0.28)';
-        ctx.shadowBlur = 24;
-        ctx.fillStyle = 'rgba(139,255,0,0.18)';
-        ctx.beginPath();
-        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 6.5, 0, Math.PI * 2);
-        ctx.fill();
         ctx.shadowColor = 'rgba(255,255,255,0.45)';
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = 'rgba(255,255,255,0.28)';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
         ctx.beginPath();
-        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 3.2, 0, Math.PI * 2);
+        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 3.0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowColor = 'rgba(139,255,0,0.18)';
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = 'rgba(139,255,0,0.06)';
+        ctx.beginPath();
+        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 5.0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -633,7 +621,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       };
 
       contourRef.current = {
-        outer: offsetContour(smoothed, 10),
+        outer: offsetContour(smoothed, 8),
         mid: offsetContour(smoothed, 6),
         inner: offsetContour(smoothed, 3),
       };
@@ -669,6 +657,11 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     }
 
     const animate = (time: number) => {
+      if (time - lastDrawTime < 1000 / 30) {
+        animationFrame = requestAnimationFrame(animate);
+        return;
+      }
+      lastDrawTime = time;
       drawTracer(time);
       animationFrame = requestAnimationFrame(animate);
     };
