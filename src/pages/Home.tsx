@@ -197,11 +197,12 @@ export default function Home() {
                 Nossos Serviços
               </Button>
             </div>
+            <HeroProcessMini />
           </div>
         </div>
       </section>
       {/* Como Funciona Section */}
-      <section className="py-10 md:py-16 bg-gradient-to-b from-transparent to-card/40 relative">
+      <section className="hidden md:block py-10 md:py-16 bg-gradient-to-b from-transparent to-card/40 relative">
         <div className="container relative z-10">
           <div className="text-center mb-6 md:mb-10">
             <h2 className="text-2xl md:text-3xl xl:text-4xl font-bold mb-4">Como funciona na InfoShire</h2>
@@ -423,6 +424,77 @@ export default function Home() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+function HeroProcessMini() {
+  const steps = [
+    {
+      title: 'Contato no WhatsApp',
+      description: 'Explique o problema e envie fotos.',
+      icon: MessageSquare,
+    },
+    {
+      title: 'Diagnóstico Técnico',
+      description: 'Avaliação completa do defeito.',
+      icon: Microscope,
+    },
+    {
+      title: 'Orçamento Transparente',
+      description: 'Você aprova online pelo sistema.',
+      icon: ShieldCheck,
+    },
+    {
+      title: 'Reparo e Entrega',
+      description: 'Reparo realizado e devolução funcionando.',
+      icon: Truck,
+    },
+  ];
+
+  return (
+    <div className="mt-10 md:hidden animate-fade-in-up" style={{ animationDelay: '1s' }}>
+      <div className="text-center mb-5">
+        <h2 className="text-xl font-semibold">Como funciona o atendimento</h2>
+        <p className="text-sm text-muted-foreground">Fluxo simples, claro e transparente.</p>
+      </div>
+      <div className="overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory">
+        <div className="flex items-center gap-6">
+          {steps.map((step, index) => {
+            const Icon = step.icon;
+            return (
+              <div key={step.title} className="flex items-center gap-6 snap-start">
+                <Card className="min-w-[80%] bg-card/45 backdrop-blur border border-primary/20 hover:border-primary/45 transition-colors">
+                  <CardContent className="p-5 space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
+                        <Icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="h-9 w-9 rounded-full bg-primary text-black font-extrabold flex items-center justify-center shadow-[0_0_10px_rgba(139,255,0,0.45)]">
+                        {index + 1}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {step.description}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+                {index < steps.length - 1 && (
+                  <div className="flex items-center justify-center">
+                    <ChevronRight className="h-6 w-6 text-primary/60 drop-shadow-[0_0_6px_rgba(139,255,0,0.35)]" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground text-center">
+        Deslize para seguir a sequência →
+      </p>
+    </div>
   );
 }
 
