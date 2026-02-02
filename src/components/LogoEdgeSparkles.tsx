@@ -1,9 +1,10 @@
+// animates only right-side segment between two anchors
 import { useEffect, useRef, useState } from 'react';
 
 const BLEED = 64;
 const DURATION_MS = 5400;
-const FADE_ALPHA = 0.14;
-const TAIL_RATIO = 0.06;
+const FADE_ALPHA = 0.18;
+const TAIL_RATIO = 0.045;
 const SPACING_PX = 4;
 const SMOOTH_WINDOW = 5;
 
@@ -26,6 +27,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     mid: [],
     inner: [],
   });
+  const segmentRef = useRef<EdgePoint[]>([]);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -115,6 +117,40 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       return resampled;
     };
 
+    const resampleOpenPath = (points: EdgePoint[], spacing: number) => {
+      if (points.length < 2) {
+        return points;
+      }
+      const resampled: EdgePoint[] = [];
+      let prev = points[0];
+      resampled.push({ ...prev });
+      let distance = 0;
+      for (let i = 1; i < points.length; i += 1) {
+        let next = points[i];
+        let dx = next.x - prev.x;
+        let dy = next.y - prev.y;
+        let segmentLength = Math.hypot(dx, dy);
+        while (distance + segmentLength >= spacing) {
+          const t = (spacing - distance) / segmentLength;
+          const point = { x: prev.x + dx * t, y: prev.y + dy * t };
+          resampled.push(point);
+          prev = point;
+          dx = next.x - prev.x;
+          dy = next.y - prev.y;
+          segmentLength = Math.hypot(dx, dy);
+          distance = 0;
+        }
+        distance += segmentLength;
+        prev = next;
+      }
+      const last = resampled[resampled.length - 1];
+      const end = points[points.length - 1];
+      if (!last || last.x !== end.x || last.y !== end.y) {
+        resampled.push({ ...end });
+      }
+      return resampled;
+    };
+
     const smoothPath = (points: EdgePoint[], windowSize: number) => {
       if (points.length === 0) {
         return points;
@@ -135,20 +171,96 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       return smoothed;
     };
 
+    const smoothOpenPath = (points: EdgePoint[], windowSize: number) => {
+      if (points.length === 0) {
+        return points;
+      }
+      const radius = Math.floor(windowSize / 2);
+      const smoothed = points.map((_, index) => {
+        let sumX = 0;
+        let sumY = 0;
+        let count = 0;
+        const start = Math.max(0, index - radius);
+        const end = Math.min(points.length - 1, index + radius);
+        for (let i = start; i <= end; i += 1) {
+          sumX += points[i].x;
+          sumY += points[i].y;
+          count += 1;
+        }
+        return { x: sumX / count, y: sumY / count };
+      });
+      return smoothed;
+    };
+
+    const nearestIndex = (points: EdgePoint[], anchor: EdgePoint) => {
+      let bestIdx = 0;
+      let bestDist = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < points.length; i += 1) {
+        const dx = points[i].x - anchor.x;
+        const dy = points[i].y - anchor.y;
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = i;
+        }
+      }
+      return bestIdx;
+    };
+
+    const averageX = (points: EdgePoint[]) => {
+      if (points.length === 0) {
+        return 0;
+      }
+      const sum = points.reduce((acc, point) => acc + point.x, 0);
+      return sum / points.length;
+    };
+
+    const buildSegment = (points: EdgePoint[], width: number, height: number) => {
+      if (points.length < 2) {
+        return [];
+      }
+      const startAnchor = { x: 0.82 * width, y: 0.78 * height };
+      const endAnchor = { x: 0.9 * width, y: 0.2 * height };
+      const startIdx = nearestIndex(points, startAnchor);
+      const endIdx = nearestIndex(points, endAnchor);
+      const total = points.length;
+      const forward: EdgePoint[] = [];
+      for (let i = startIdx; ; i = (i + 1) % total) {
+        forward.push(points[i]);
+        if (i === endIdx) {
+          break;
+        }
+      }
+      const backward: EdgePoint[] = [];
+      for (let i = startIdx; ; i = (i - 1 + total) % total) {
+        backward.push(points[i]);
+        if (i === endIdx) {
+          break;
+        }
+      }
+      let chosen = averageX(forward) >= averageX(backward) ? forward : backward;
+      const maxLen = Math.floor(total * 0.55);
+      if (chosen.length > maxLen) {
+        chosen = chosen === forward ? backward : forward;
+      }
+      const resampledSegment = resampleOpenPath(chosen, SPACING_PX);
+      return smoothOpenPath(resampledSegment, SMOOTH_WINDOW);
+    };
+
     function drawReducedMotion() {
-      const contour = contourRef.current.outer;
+      const contour = segmentRef.current;
       ctx.clearRect(0, 0, drawSize.width, drawSize.height);
       if (contour.length === 0) {
         return;
       }
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.shadowColor = 'rgba(139,255,0,0.18)';
-      ctx.shadowBlur = 10;
-      ctx.lineWidth = 3.2;
+      ctx.shadowColor = 'rgba(255,255,255,0.28)';
+      ctx.shadowBlur = 7;
+      ctx.lineWidth = 1.4;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(139,255,0,0.08)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
       const offsetX = BLEED;
       const offsetY = BLEED;
       ctx.beginPath();
@@ -161,12 +273,6 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
           ctx.lineTo(x, y);
         }
       });
-      ctx.closePath();
-      ctx.stroke();
-      ctx.shadowColor = 'rgba(255,255,255,0.35)';
-      ctx.shadowBlur = 6;
-      ctx.lineWidth = 1.6;
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
       ctx.stroke();
       ctx.restore();
     }
@@ -211,7 +317,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
     }
 
     function drawTracer(time: number) {
-      const contour = contourRef.current.outer;
+      const contour = segmentRef.current;
       if (contour.length < 2) {
         return;
       }
@@ -235,10 +341,10 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         tailLen,
         offsetX,
         offsetY,
-        3.2,
-        'rgba(139,255,0,0.18)',
+        2.2,
+        'rgba(139,255,0,0.10)',
         10,
-        0.08,
+        0.05,
         { r: 139, g: 255, b: 0 },
       );
       drawTailLayer(
@@ -247,9 +353,9 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         tailLen,
         offsetX,
         offsetY,
-        1.6,
-        'rgba(255,255,255,0.35)',
-        6,
+        1.4,
+        'rgba(255,255,255,0.40)',
+        7,
         0.22,
         { r: 255, g: 255, b: 255 },
       );
@@ -258,17 +364,17 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       if (headPoint) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.shadowColor = 'rgba(255,255,255,0.45)';
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.shadowColor = 'rgba(255,255,255,0.35)';
+        ctx.shadowBlur = 7;
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
         ctx.beginPath();
-        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 3.0, 0, Math.PI * 2);
+        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 2.2, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowColor = 'rgba(139,255,0,0.18)';
-        ctx.shadowBlur = 14;
-        ctx.fillStyle = 'rgba(139,255,0,0.06)';
+        ctx.shadowColor = 'rgba(139,255,0,0.12)';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = 'rgba(139,255,0,0.04)';
         ctx.beginPath();
-        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 5.0, 0, Math.PI * 2);
+        ctx.arc(headPoint.x + offsetX, headPoint.y + offsetY, 4.0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -532,6 +638,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
 
       if (contourPixels.length === 0) {
         contourRef.current = { outer: [], mid: [], inner: [] };
+        segmentRef.current = [];
         return;
       }
 
@@ -625,6 +732,7 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         mid: offsetContour(smoothed, 6),
         inner: offsetContour(smoothed, 3),
       };
+      segmentRef.current = buildSegment(contourRef.current.outer, width, height);
       ctx.clearRect(0, 0, drawSize.width, drawSize.height);
       if (prefersReducedMotion) {
         drawReducedMotion();
