@@ -302,23 +302,70 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
 
       const pixelWidth = Math.max(1, Math.floor(width * currentPixelRatio));
       const pixelHeight = Math.max(1, Math.floor(height * currentPixelRatio));
-      offscreenCanvas.width = pixelWidth;
-      offscreenCanvas.height = pixelHeight;
+      const maxDim = 320;
+      const scale = Math.min(1, maxDim / Math.max(pixelWidth, pixelHeight));
+      const analysisWidth = Math.max(1, Math.floor(pixelWidth * scale));
+      const analysisHeight = Math.max(1, Math.floor(pixelHeight * scale));
+      offscreenCanvas.width = analysisWidth;
+      offscreenCanvas.height = analysisHeight;
       offscreenContext.setTransform(1, 0, 0, 1, 0, 0);
-      offscreenContext.clearRect(0, 0, pixelWidth, pixelHeight);
-      offscreenContext.drawImage(image, 0, 0, pixelWidth, pixelHeight);
+      offscreenContext.clearRect(0, 0, analysisWidth, analysisHeight);
+      offscreenContext.drawImage(image, 0, 0, analysisWidth, analysisHeight);
 
-      const imageData = offscreenContext.getImageData(0, 0, pixelWidth, pixelHeight);
+      const imageData = offscreenContext.getImageData(0, 0, analysisWidth, analysisHeight);
       const { data } = imageData;
-      const totalPixels = pixelWidth * pixelHeight;
+      const totalPixels = analysisWidth * analysisHeight;
       const baseMask = new Uint8Array(totalPixels);
+      const samplePatch = (startX: number, startY: number, size = 6) => {
+        let sumR = 0;
+        let sumG = 0;
+        let sumB = 0;
+        let count = 0;
+        const endX = Math.min(analysisWidth, startX + size);
+        const endY = Math.min(analysisHeight, startY + size);
+        for (let y = startY; y < endY; y += 1) {
+          for (let x = startX; x < endX; x += 1) {
+            const idx = (y * analysisWidth + x) * 4;
+            sumR += data[idx];
+            sumG += data[idx + 1];
+            sumB += data[idx + 2];
+            count += 1;
+          }
+        }
+        return {
+          r: count > 0 ? sumR / count : 255,
+          g: count > 0 ? sumG / count : 255,
+          b: count > 0 ? sumB / count : 255,
+        };
+      };
+
+      const topLeft = samplePatch(0, 0);
+      const topRight = samplePatch(Math.max(0, analysisWidth - 6), 0);
+      const bottomLeft = samplePatch(0, Math.max(0, analysisHeight - 6));
+      const bottomRight = samplePatch(
+        Math.max(0, analysisWidth - 6),
+        Math.max(0, analysisHeight - 6),
+      );
+      const bgR = (topLeft.r + topRight.r + bottomLeft.r + bottomRight.r) / 4;
+      const bgG = (topLeft.g + topRight.g + bottomLeft.g + bottomRight.g) / 4;
+      const bgB = (topLeft.b + topRight.b + bottomLeft.b + bottomRight.b) / 4;
+      const bgIsBright = bgR > 235 && bgG > 235 && bgB > 235;
       for (let i = 0; i < totalPixels; i += 1) {
         const offset = i * 4;
         const r = data[offset];
         const g = data[offset + 1];
         const b = data[offset + 2];
         const a = data[offset + 3];
-        const foreground = a > 20 || r < 248 || g < 248 || b < 248;
+        if (a < 10) {
+          baseMask[i] = 0;
+          continue;
+        }
+        const dr = r - bgR;
+        const dg = g - bgG;
+        const db = b - bgB;
+        const dist = Math.hypot(dr, dg, db);
+        const nearWhite = bgIsBright && r > 235 && g > 235 && b > 235 && dist < 40;
+        const foreground = dist > 32 && a > 10 && !nearWhite;
         baseMask[i] = foreground ? 1 : 0;
       }
 
@@ -338,21 +385,21 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       const applyDilation = (mask: Uint8Array, radius: number) => {
         const offsets = buildOffsets(radius);
         const next = new Uint8Array(mask.length);
-        for (let y = 0; y < pixelHeight; y += 1) {
-          for (let x = 0; x < pixelWidth; x += 1) {
+        for (let y = 0; y < analysisHeight; y += 1) {
+          for (let x = 0; x < analysisWidth; x += 1) {
             let solid = 0;
             for (const { dx, dy } of offsets) {
               const nx = x + dx;
               const ny = y + dy;
-              if (nx < 0 || ny < 0 || nx >= pixelWidth || ny >= pixelHeight) {
+              if (nx < 0 || ny < 0 || nx >= analysisWidth || ny >= analysisHeight) {
                 continue;
               }
-              if (mask[ny * pixelWidth + nx] === 1) {
+              if (mask[ny * analysisWidth + nx] === 1) {
                 solid = 1;
                 break;
               }
             }
-            next[y * pixelWidth + x] = solid;
+            next[y * analysisWidth + x] = solid;
           }
         }
         return next;
@@ -361,47 +408,47 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       const applyErosion = (mask: Uint8Array, radius: number) => {
         const offsets = buildOffsets(radius);
         const next = new Uint8Array(mask.length);
-        for (let y = 0; y < pixelHeight; y += 1) {
-          for (let x = 0; x < pixelWidth; x += 1) {
+        for (let y = 0; y < analysisHeight; y += 1) {
+          for (let x = 0; x < analysisWidth; x += 1) {
             let solid = 1;
             for (const { dx, dy } of offsets) {
               const nx = x + dx;
               const ny = y + dy;
-              if (nx < 0 || ny < 0 || nx >= pixelWidth || ny >= pixelHeight) {
+              if (nx < 0 || ny < 0 || nx >= analysisWidth || ny >= analysisHeight) {
                 solid = 0;
                 break;
               }
-              if (mask[ny * pixelWidth + nx] === 0) {
+              if (mask[ny * analysisWidth + nx] === 0) {
                 solid = 0;
                 break;
               }
             }
-            next[y * pixelWidth + x] = solid;
+            next[y * analysisWidth + x] = solid;
           }
         }
         return next;
       };
 
-      const morphRadius = 7;
+      const morphRadius = 5;
       const solid = applyErosion(applyDilation(baseMask, morphRadius), morphRadius);
 
       const outside = new Uint8Array(totalPixels);
       const queue: number[] = [];
       const enqueueIfOutside = (x: number, y: number) => {
-        const index = y * pixelWidth + x;
+        const index = y * analysisWidth + x;
         if (solid[index] === 0 && outside[index] === 0) {
           outside[index] = 1;
           queue.push(index);
         }
       };
 
-      for (let x = 0; x < pixelWidth; x += 1) {
+      for (let x = 0; x < analysisWidth; x += 1) {
         enqueueIfOutside(x, 0);
-        enqueueIfOutside(x, pixelHeight - 1);
+        enqueueIfOutside(x, analysisHeight - 1);
       }
-      for (let y = 0; y < pixelHeight; y += 1) {
+      for (let y = 0; y < analysisHeight; y += 1) {
         enqueueIfOutside(0, y);
-        enqueueIfOutside(pixelWidth - 1, y);
+        enqueueIfOutside(analysisWidth - 1, y);
       }
 
       while (queue.length > 0) {
@@ -409,26 +456,26 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         if (index === undefined) {
           break;
         }
-        const x = index % pixelWidth;
-        const y = Math.floor(index / pixelWidth);
+        const x = index % analysisWidth;
+        const y = Math.floor(index / analysisWidth);
         if (x > 0) enqueueIfOutside(x - 1, y);
-        if (x < pixelWidth - 1) enqueueIfOutside(x + 1, y);
+        if (x < analysisWidth - 1) enqueueIfOutside(x + 1, y);
         if (y > 0) enqueueIfOutside(x, y - 1);
-        if (y < pixelHeight - 1) enqueueIfOutside(x, y + 1);
+        if (y < analysisHeight - 1) enqueueIfOutside(x, y + 1);
       }
 
       const edgeMask = new Uint8Array(totalPixels);
-      for (let y = 0; y < pixelHeight; y += 1) {
-        for (let x = 0; x < pixelWidth; x += 1) {
-          const index = y * pixelWidth + x;
+      for (let y = 0; y < analysisHeight; y += 1) {
+        for (let x = 0; x < analysisWidth; x += 1) {
+          const index = y * analysisWidth + x;
           if (solid[index] === 0) {
             continue;
           }
           const hasOutsideNeighbor =
             (x > 0 && outside[index - 1] === 1) ||
-            (x < pixelWidth - 1 && outside[index + 1] === 1) ||
-            (y > 0 && outside[index - pixelWidth] === 1) ||
-            (y < pixelHeight - 1 && outside[index + pixelWidth] === 1);
+            (x < analysisWidth - 1 && outside[index + 1] === 1) ||
+            (y > 0 && outside[index - analysisWidth] === 1) ||
+            (y < analysisHeight - 1 && outside[index + analysisWidth] === 1);
           if (!hasOutsideNeighbor) {
             continue;
           }
@@ -458,10 +505,10 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
             const nextDir = (dir + 6 + i) % 8;
             const nx = current.x + directions[nextDir].x;
             const ny = current.y + directions[nextDir].y;
-            if (nx < 0 || ny < 0 || nx >= pixelWidth || ny >= pixelHeight) {
+            if (nx < 0 || ny < 0 || nx >= analysisWidth || ny >= analysisHeight) {
               continue;
             }
-            if (edgeMask[ny * pixelWidth + nx] === 1) {
+            if (edgeMask[ny * analysisWidth + nx] === 1) {
               current = { x: nx, y: ny };
               contourPixels.push(current);
               dir = nextDir;
@@ -480,9 +527,9 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       };
 
       let startPixel: EdgePoint | null = null;
-      for (let y = 0; y < pixelHeight; y += 1) {
-        for (let x = 0; x < pixelWidth; x += 1) {
-          const index = y * pixelWidth + x;
+      for (let y = 0; y < analysisHeight; y += 1) {
+        for (let x = 0; x < analysisWidth; x += 1) {
+          const index = y * analysisWidth + x;
           if (edgeMask[index] === 1) {
             startPixel = { x, y };
             break;
@@ -501,8 +548,8 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
       }
 
       const contourCss = contourPixels.map((point) => ({
-        x: point.x / currentPixelRatio,
-        y: point.y / currentPixelRatio,
+        x: point.x / scale / currentPixelRatio,
+        y: point.y / scale / currentPixelRatio,
       }));
       const resampled = resamplePath(contourCss, SPACING_PX);
       const smoothed = smoothPath(resampled, SMOOTH_WINDOW);
@@ -518,6 +565,15 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         return sum * 0.5;
       };
 
+      const isOutsideAtCss = (point: EdgePoint) => {
+        const px = Math.round(point.x * currentPixelRatio * scale);
+        const py = Math.round(point.y * currentPixelRatio * scale);
+        if (px < 0 || py < 0 || px >= analysisWidth || py >= analysisHeight) {
+          return true;
+        }
+        return outside[py * analysisWidth + px] === 1;
+      };
+
       const offsetContour = (pts: EdgePoint[], distance: number) => {
         if (pts.length === 0) {
           return pts;
@@ -526,7 +582,30 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         if (area === 0) {
           return pts.map((p) => ({ ...p }));
         }
-        const orientation = Math.sign(area);
+        let orientation = Math.sign(area);
+        const sample = pts[0];
+        if (sample) {
+          const next = pts[1 % pts.length];
+          const prev = pts[(pts.length - 1) % pts.length];
+          const dx = next.x - prev.x;
+          const dy = next.y - prev.y;
+          const tangentLength = Math.hypot(dx, dy);
+          if (tangentLength > 0.001) {
+            let nx = 0;
+            let ny = 0;
+            if (orientation > 0) {
+              nx = dy / tangentLength;
+              ny = -dx / tangentLength;
+            } else {
+              nx = -dy / tangentLength;
+              ny = dx / tangentLength;
+            }
+            const probe = { x: sample.x + nx, y: sample.y + ny };
+            if (!isOutsideAtCss(probe)) {
+              orientation *= -1;
+            }
+          }
+        }
         const length = pts.length;
         return pts.map((point, index) => {
           const prev = pts[(index - 1 + length) % length];
@@ -555,8 +634,8 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
 
       contourRef.current = {
         outer: offsetContour(smoothed, 10),
-        mid: offsetContour(smoothed, 5),
-        inner: offsetContour(smoothed, 2),
+        mid: offsetContour(smoothed, 6),
+        inner: offsetContour(smoothed, 3),
       };
       ctx.clearRect(0, 0, drawSize.width, drawSize.height);
       if (prefersReducedMotion) {
