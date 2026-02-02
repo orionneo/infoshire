@@ -420,10 +420,77 @@ export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: Log
         }
       }
 
-      const contourPixels = contours.reduce<EdgePoint[]>(
-        (longest, contour) => (contour.length > longest.length ? contour : longest),
-        [],
-      );
+      const bboxArea = (pts: EdgePoint[]) => {
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        for (const p of pts) {
+          if (p.x < minX) minX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y > maxY) maxY = p.y;
+        }
+        const w = Math.max(0, maxX - minX);
+        const h = Math.max(0, maxY - minY);
+        return { area: w * h, minX, minY, maxX, maxY };
+      };
+
+      const polygonAreaAbs = (pts: EdgePoint[]) => {
+        if (pts.length < 3) return 0;
+        let sum = 0;
+        for (let i = 0; i < pts.length; i += 1) {
+          const a = pts[i];
+          const b = pts[(i + 1) % pts.length];
+          sum += a.x * b.y - b.x * a.y;
+        }
+        return Math.abs(sum) * 0.5;
+      };
+
+      const imageBox = { w: pixelWidth, h: pixelHeight, area: pixelWidth * pixelHeight };
+
+      let best: EdgePoint[] = [];
+      let bestScore = -1;
+      let bestBboxArea = -1;
+      let bestLen = -1;
+
+      for (const c of contours) {
+        if (c.length < 8) continue;
+        const bb = bboxArea(c);
+        const poly = polygonAreaAbs(c);
+        const score = bb.area * 0.85 + poly * 0.15;
+
+        if (
+          score > bestScore ||
+          (score === bestScore && bb.area > bestBboxArea) ||
+          (score === bestScore && bb.area === bestBboxArea && c.length > bestLen)
+        ) {
+          best = c;
+          bestScore = score;
+          bestBboxArea = bb.area;
+          bestLen = c.length;
+        }
+      }
+
+      // Guard: if best bbox is suspiciously small, still keep the largest bbox contour
+      if (best.length > 0) {
+        const bb = bboxArea(best);
+        const minAccept = imageBox.area * 0.2;
+        if (bb.area < minAccept) {
+          let fallback: EdgePoint[] = best;
+          let fallbackArea = bb.area;
+          for (const c of contours) {
+            const a = bboxArea(c).area;
+            if (a > fallbackArea) {
+              fallback = c;
+              fallbackArea = a;
+            }
+          }
+          best = fallback;
+        }
+      }
+
+      const contourPixels = best;
 
       if (contourPixels.length === 0) {
         contourRef.current = [];
