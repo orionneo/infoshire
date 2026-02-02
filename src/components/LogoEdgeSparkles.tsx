@@ -5,8 +5,10 @@ type LogoEdgeSparklesProps = {
 };
 
 export function LogoEdgeSparkles({ src, alt = 'Logo InfoShire', className }: LogoEdgeSparklesProps) {
+  const wrapperClassName = ['relative inline-block', className].filter(Boolean).join(' ');
+
   return (
-    <div className={`relative inline-block ${className ?? ''}`.trim()}>
+    <div className={wrapperClassName}>
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-0 rounded-[22px] opacity-60 blur-[10px] mix-blend-screen"
