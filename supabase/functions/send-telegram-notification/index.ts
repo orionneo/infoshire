@@ -7,13 +7,15 @@ const corsHeaders = {
 };
 
 interface TelegramNotificationRequest {
-  orderNumber: string;
-  equipment: string;
-  clientName: string;
+  orderNumber?: string;
+  equipment?: string;
+  clientName?: string;
   totalCost?: number;
   laborCost?: number;
   partsCost?: number;
-  notificationType: 'approved' | 'not_approved';
+  requestedDate?: string;
+  requestedTime?: string;
+  notificationType: 'approved' | 'not_approved' | 'appointment_requested';
 }
 
 Deno.serve(async (req) => {
@@ -30,7 +32,17 @@ Deno.serve(async (req) => {
 
     // Get request body
     const body: TelegramNotificationRequest = await req.json();
-    const { orderNumber, equipment, clientName, totalCost, laborCost, partsCost, notificationType } = body;
+    const {
+      orderNumber,
+      equipment,
+      clientName,
+      totalCost,
+      laborCost,
+      partsCost,
+      requestedDate,
+      requestedTime,
+      notificationType,
+    } = body;
 
     // Get Telegram settings from database
     const { data: settings, error: settingsError } = await supabaseClient
@@ -87,7 +99,16 @@ Deno.serve(async (req) => {
     // Format message based on notification type
     let message = '';
     
-    if (notificationType === 'not_approved') {
+    if (notificationType === 'appointment_requested') {
+      message = `
+📆 *NOVO AGENDAMENTO SOLICITADO*
+
+👤 *Cliente:* ${clientName || 'Cliente'}
+🔧 *Equipamento:* ${equipment || 'Não informado'}
+🗓️ *Data:* ${requestedDate || 'A definir'}
+⏰ *Horário:* ${requestedTime || 'A definir'}
+      `.trim();
+    } else if (notificationType === 'not_approved') {
       message = `
 ❌ *ORÇAMENTO NÃO APROVADO*
 
