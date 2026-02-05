@@ -1,4 +1,4 @@
-import { BarChart3, Brain, DollarSign, Home, LayoutDashboard, LogOut, Mail, Megaphone, Menu, MessageSquare, Package, Settings, SettingsIcon, Shield, UserCog, Users, Wrench } from 'lucide-react';
+import { BarChart3, Brain, CalendarClock, DollarSign, Home, LayoutDashboard, LogOut, Mail, Megaphone, Menu, MessageSquare, Package, Settings, SettingsIcon, Shield, UserCog, Users, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ApprovalNotifications } from '@/components/ApprovalNotifications';
@@ -21,6 +21,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/admin/orders', label: 'Ordens de Serviço', icon: Package },
+    { to: '/admin/appointments', label: 'Agendamentos', icon: CalendarClock },
     { to: '/admin/clients', label: 'Clientes', icon: Users },
     { to: '/admin/financial', label: 'Financeiro', icon: DollarSign },
     { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },

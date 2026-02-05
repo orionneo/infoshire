@@ -1,4 +1,4 @@
-import { LogOut, Menu, Package, User, Wrench } from 'lucide-react';
+import { CalendarClock, LogOut, Menu, Package, User, Wrench } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -16,6 +16,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { to: '/client', label: 'Minhas Ordens', icon: Package },
+    { to: '/client/appointments', label: 'Solicitar agendamento', icon: CalendarClock },
     { to: '/client/profile', label: 'Perfil', icon: User },
   ];
 

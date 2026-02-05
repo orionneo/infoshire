@@ -21,6 +21,7 @@ import BudgetApproval from './pages/BudgetApproval';
 import ChangePassword from './pages/ChangePassword';
 import CompleteProfile from './pages/CompleteProfile';
 import Contact from './pages/Contact';
+import { AdminAppointments, ClientAppointments } from './pages/appointments/Appointments';
 // Client pages
 import ClientDashboard from './pages/client/ClientDashboard';
 import ClientOrderDetail from './pages/client/ClientOrderDetail';
@@ -140,6 +141,11 @@ const routes: RouteConfig[] = [
     path: '/client/profile',
     element: <ClientProfile />,
   },
+  {
+    name: 'Client Appointments',
+    path: '/client/appointments',
+    element: <ClientAppointments />,
+  },
   
   // Admin routes
   {
@@ -151,6 +157,11 @@ const routes: RouteConfig[] = [
     name: 'Admin Orders',
     path: '/admin/orders',
     element: <AdminOrders />,
+  },
+  {
+    name: 'Admin Appointments',
+    path: '/admin/appointments',
+    element: <AdminAppointments />,
   },
   {
     name: 'Admin Order Detail',
