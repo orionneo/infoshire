@@ -75,7 +75,9 @@ export function ClientAppointments() {
 
   const windowDates = useMemo(() => {
     const today = startOfDay(new Date());
-    return Array.from({ length: WINDOW_DAYS }, (_, index) => addDays(today, index));
+    return Array.from({ length: WINDOW_DAYS }, (_, index) => addDays(today, index)).filter(
+      (date) => date.getDay() !== 0
+    );
   }, []);
 
   const loadSlots = useCallback(async () => {
