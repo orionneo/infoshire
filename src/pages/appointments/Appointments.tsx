@@ -2,6 +2,7 @@ import { addDays, format, startOfDay, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, CalendarDays, Clock, List, Loader2, User, Wrench } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { ClientLayout } from '@/components/layouts/ClientLayout';
 import { Button } from '@/components/ui/button';
@@ -61,9 +62,20 @@ interface AppointmentRecord {
   } | null;
 }
 
+interface ClientAppointmentListItem {
+  id: string;
+  requested_date: string;
+  requested_time: string;
+  status: 'REQUESTED' | 'CONFIRMED' | 'CONVERTED' | 'CANCELED';
+  equipment: string;
+  os_id: string | null;
+  created_at: string;
+}
+
 export function ClientAppointments() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<Record<string, string[]>>({});
@@ -72,6 +84,8 @@ export function ClientAppointments() {
   const [equipment, setEquipment] = useState('');
   const [problem, setProblem] = useState('');
   const [notes, setNotes] = useState('');
+  const [clientAppointments, setClientAppointments] = useState<ClientAppointmentListItem[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
 
   const windowDates = useMemo(() => {
     const today = startOfDay(new Date());
@@ -131,6 +145,34 @@ export function ClientAppointments() {
   useEffect(() => {
     loadSlots();
   }, [loadSlots]);
+
+  const loadClientAppointments = useCallback(async () => {
+    if (!user) return;
+    setAppointmentsLoading(true);
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('id, requested_date, requested_time, status, equipment, os_id, created_at')
+      .eq('client_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao carregar meus agendamentos:', error);
+      toast({
+        title: 'Erro ao carregar agendamentos',
+        description: 'Não foi possível carregar seus agendamentos.',
+        variant: 'destructive',
+      });
+      setAppointmentsLoading(false);
+      return;
+    }
+
+    setClientAppointments((data || []) as ClientAppointmentListItem[]);
+    setAppointmentsLoading(false);
+  }, [toast, user]);
+
+  useEffect(() => {
+    loadClientAppointments();
+  }, [loadClientAppointments]);
 
   useEffect(() => {
     if (selectedDate && availableSlots[selectedDate]?.length) {
@@ -195,11 +237,18 @@ export function ClientAppointments() {
     setNotes('');
     setSelectedTime('');
     await loadSlots();
+    await loadClientAppointments();
     setSubmitting(false);
   };
 
   const availableDates = Object.keys(availableSlots);
   const timesForSelectedDate = selectedDate ? availableSlots[selectedDate] || [] : [];
+  const statusLabels: Record<ClientAppointmentListItem['status'], string> = {
+    REQUESTED: 'Solicitado',
+    CONFIRMED: 'Confirmado',
+    CONVERTED: 'OS criada',
+    CANCELED: 'Cancelado',
+  };
 
   return (
     <ClientLayout>
@@ -288,6 +337,45 @@ export function ClientAppointments() {
                   </Button>
                 </div>
               </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Meus agendamentos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {appointmentsLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : clientAppointments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Você ainda não tem agendamentos.</p>
+            ) : (
+              <div className="space-y-3">
+                {clientAppointments.map((appointment) => (
+                  <div key={appointment.id} className="rounded-lg border p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold">{appointment.equipment}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(appointment.requested_date), 'dd/MM/yyyy', { locale: ptBR })} ·{' '}
+                          {formatAppointmentTime(appointment.requested_time)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Status: {statusLabels[appointment.status]}
+                        </p>
+                      </div>
+                      {appointment.os_id ? (
+                        <Button variant="outline" onClick={() => navigate(`/client/orders/${appointment.os_id}`)}>
+                          Ver OS
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>

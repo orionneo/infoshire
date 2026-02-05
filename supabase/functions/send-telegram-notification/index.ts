@@ -44,6 +44,17 @@ Deno.serve(async (req) => {
       notificationType,
     } = body;
 
+    const validNotificationTypes = ['approved', 'not_approved', 'appointment_requested'] as const;
+    if (!notificationType || !validNotificationTypes.includes(notificationType)) {
+      return new Response(
+        JSON.stringify({ error: 'notificationType inválido' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // Get Telegram settings from database
     const { data: settings, error: settingsError } = await supabaseClient
       .from("site_settings")
@@ -98,44 +109,66 @@ Deno.serve(async (req) => {
 
     // Format message based on notification type
     let message = '';
-    
-    if (notificationType === 'appointment_requested') {
-      message = `
+
+    switch (notificationType) {
+      case 'appointment_requested': {
+        const safeClientName = clientName || 'Não informado';
+        const safeEquipment = equipment || 'Não informado';
+        const safeRequestedDate = requestedDate || 'Não informado';
+        const safeRequestedTime = requestedTime || 'Não informado';
+
+        message = `
 📆 *NOVO AGENDAMENTO SOLICITADO*
 
-👤 *Cliente:* ${clientName || 'Cliente'}
-🔧 *Equipamento:* ${equipment || 'Não informado'}
-🗓️ *Data:* ${requestedDate || 'A definir'}
-⏰ *Horário:* ${requestedTime || 'A definir'}
-      `.trim();
-    } else if (notificationType === 'not_approved') {
-      message = `
+👤 *Cliente:* ${safeClientName}
+🔧 *Equipamento:* ${safeEquipment}
+🗓️ *Data:* ${safeRequestedDate}
+⏰ *Horário:* ${safeRequestedTime}
+        `.trim();
+        break;
+      }
+      case 'not_approved': {
+        const safeOrderNumber = orderNumber || '-';
+        const safeClientName = clientName || 'Não informado';
+        const safeEquipment = equipment || 'Não informado';
+
+        message = `
 ❌ *ORÇAMENTO NÃO APROVADO*
 
-📋 *OS:* #${orderNumber}
-👤 *Cliente:* ${clientName}
-🔧 *Equipamento:* ${equipment}
+📋 *OS:* #${safeOrderNumber}
+👤 *Cliente:* ${safeClientName}
+🔧 *Equipamento:* ${safeEquipment}
 
 ⚠️ O cliente não aprovou o orçamento.
 📦 Equipamento deve ser retirado em até 7 dias.
 💰 Após 7 dias: taxa de R$ 20,00/dia por armazenamento.
-      `.trim();
-    } else {
-      // Original approved message
-      message = `
+        `.trim();
+        break;
+      }
+      case 'approved': {
+        const safeOrderNumber = orderNumber || '-';
+        const safeClientName = clientName || 'Não informado';
+        const safeEquipment = equipment || 'Não informado';
+        const safeLaborCost = typeof laborCost === 'number' ? laborCost : 0;
+        const safePartsCost = typeof partsCost === 'number' ? partsCost : 0;
+        const safeTotalCost = typeof totalCost === 'number' ? totalCost : 0;
+
+        message = `
 🎉 *ORÇAMENTO APROVADO!*
 
-📋 *OS:* #${orderNumber}
-👤 *Cliente:* ${clientName}
-🔧 *Equipamento:* ${equipment}
+📋 *OS:* #${safeOrderNumber}
+👤 *Cliente:* ${safeClientName}
+🔧 *Equipamento:* ${safeEquipment}
 
 💰 *Valores:*
-• Mão de Obra: R$ ${(laborCost || 0).toFixed(2).replace(".", ",")}
-• Peças: R$ ${(partsCost || 0).toFixed(2).replace(".", ",")}
-• *Total: R$ ${(totalCost || 0).toFixed(2).replace(".", ",")}*
+• Mão de Obra: R$ ${safeLaborCost.toFixed(2).replace(".", ",")}
+• Peças: R$ ${safePartsCost.toFixed(2).replace(".", ",")}
+• *Total: R$ ${safeTotalCost.toFixed(2).replace(".", ",")}*
 
 ✅ O cliente aprovou o orçamento e o reparo pode ser iniciado!
-      `.trim();
+        `.trim();
+        break;
+      }
     }
 
     // Send message via Telegram Bot API
