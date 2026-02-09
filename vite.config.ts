@@ -4,8 +4,6 @@ import svgr from 'vite-plugin-svgr';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
-import { miaodaDevPlugin } from "miaoda-sc-plugin";
-
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -79,27 +77,12 @@ export default defineConfig({
               },
             },
           },
-          {
-            urlPattern: /^https:\/\/.*\.medo\.dev\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'images-cache-v73',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
         ],
       },
       devOptions: {
         enabled: true,
       },
     }),
-    miaodaDevPlugin(),
   ],
   resolve: {
     alias: {

@@ -23,7 +23,7 @@ export function useSpeechToText(options: UseSpeechToTextOptions = {}) {
   const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isStoppingRef = useRef(false);
-  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // Verificar se o navegador suporta Speech Recognition
