@@ -76,24 +76,24 @@ const statusConfig: Record<OrderStatus, {
 };
 
 export function OrderStatusBadge({ status, showIcon = false }: { status: OrderStatus; showIcon?: boolean }) {
-  const config = statusConfig[status];
+  const config = (statusConfig as any)[status] ?? { label: String(status ?? "Status desconhecido"), color: "text-muted-foreground", bgColor: "bg-muted/20", borderColor: "border-muted", icon: "" };
   
   return (
     <Badge 
       className={`whitespace-nowrap border ${config.color} ${config.bgColor} ${config.borderColor}`}
     >
-      {showIcon && <span className="mr-1">{config.icon}</span>}
+      {showIcon && config.icon && <span className="mr-1">{config.icon}</span>}
       {config.label}
     </Badge>
   );
 }
 
 export function getStatusLabel(status: OrderStatus): string {
-  return statusConfig[status].label;
+  return ((statusConfig as any)[status]?.label) ?? String(status ?? "Status desconhecido");
 }
 
 export function getStatusConfig(status: OrderStatus) {
-  return statusConfig[status];
+  return (statusConfig as any)[status] ?? { label: String(status ?? "Status desconhecido"), color: "text-muted-foreground", bgColor: "bg-muted/20", borderColor: "border-muted", icon: "" };
 }
 
 export const allStatuses: { value: OrderStatus; label: string }[] = [
