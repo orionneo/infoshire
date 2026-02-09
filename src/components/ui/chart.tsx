@@ -182,21 +182,21 @@ function ChartTooltipContent({
       {!nestLabel ? tooltipLabel : null}
       <div className="grid gap-1.5">
         {safePayload.map((item, index) => {
-          const key = `${nameKey || item.name || item.dataKey || "value"}`;
+          const key = `${nameKey || item?.name || item?.dataKey || "value"}`;
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
           const indicatorColor =
             color ?? item?.payload?.fill ?? item?.color ?? "currentColor";
 
           return (
             <div
-              key={item.dataKey ?? item.name ?? index}
+              key={item?.dataKey ?? item?.name ?? index}
               className={cn(
                 "[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5",
                 indicator === "dot" && "items-center"
               )}
             >
-              {formatter && item?.value !== undefined && item.name ? (
-                formatter(item.value, item.name, item, index, item.payload)
+              {formatter && item?.value !== undefined && item?.name ? (
+                formatter(item?.value, item?.name, item, index, item?.payload)
               ) : (
                 <>
                   {itemConfig?.icon ? (
@@ -232,7 +232,7 @@ function ChartTooltipContent({
                     <div className="grid gap-1.5">
                       {nestLabel ? tooltipLabel : null}
                       <span className="text-muted-foreground">
-                        {itemConfig?.label || item.name}
+                        {itemConfig?.label || item?.name}
                       </span>
                     </div>
                     {item.value !== undefined && (
@@ -284,12 +284,12 @@ function ChartLegendContent({
       )}
     >
       {safePayload.map((item, index) => {
-        const key = `${nameKey || item.dataKey || "value"}`;
+        const key = `${nameKey || item?.dataKey || "value"}`;
         const itemConfig = getPayloadConfigFromPayload(config, item, key);
 
         return (
           <div
-            key={item.value ?? item.dataKey ?? index}
+            key={item?.value ?? item?.dataKey ?? index}
             className={cn(
               "[&>svg]:text-muted-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3"
             )}
