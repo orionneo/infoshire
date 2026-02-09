@@ -1,0 +1,5 @@
+ALTER TABLE approval_history
+ADD COLUMN IF NOT EXISTS subtotal_cost NUMERIC,
+ADD COLUMN IF NOT EXISTS discount_amount NUMERIC,
+ADD COLUMN IF NOT EXISTS discount_reason TEXT,
+ADD COLUMN IF NOT EXISTS total_final_cost NUMERIC;

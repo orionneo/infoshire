@@ -267,11 +267,25 @@ export async function updateServiceOrderDiscount(
   discountAmount: number,
   discountReason: string
 ): Promise<ServiceOrder> {
+  const { data: existingOrder, error: fetchError } = await supabase
+    .from('service_orders')
+    .select('labor_cost, parts_cost')
+    .eq('id', orderId)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  const laborCost = Number(existingOrder?.labor_cost) || 0;
+  const partsCost = Number(existingOrder?.parts_cost) || 0;
+  const subtotal = laborCost + partsCost;
+  const totalFinal = Math.max(subtotal - (Number(discountAmount) || 0), 0);
+
   const { data, error } = await supabase
     .from('service_orders')
     .update({
       discount_amount: discountAmount,
       discount_reason: discountReason || null,
+      total_cost: totalFinal,
     })
     .eq('id', orderId)
     .select()
@@ -1183,7 +1197,7 @@ export interface MonthlyRevenue {
 export async function getFinancialSummary(startDate?: string, endDate?: string): Promise<FinancialSummary> {
   let query = supabase
     .from('service_orders')
-    .select('total_cost, discount_amount, status, approved_at, budget_approved');
+    .select('total_cost, status, approved_at, budget_approved');
 
   if (startDate) {
     query = query.gte('approved_at', startDate);
@@ -1198,12 +1212,11 @@ export async function getFinancialSummary(startDate?: string, endDate?: string):
 
   const orders = Array.isArray(data) ? data : [];
   
-  // Calcular receita total (total_cost - discount_amount) apenas de ordens aprovadas
+  // Calcular receita total apenas de ordens aprovadas
   const approvedOrders = orders.filter(o => o.budget_approved && o.total_cost);
   const totalRevenue = approvedOrders.reduce((sum, order) => {
     const cost = Number(order.total_cost) || 0;
-    const discount = Number(order.discount_amount) || 0;
-    return sum + (cost - discount);
+    return sum + cost;
   }, 0);
 
   const completedOrders = orders.filter(o => 
@@ -1226,7 +1239,7 @@ export async function getFinancialSummary(startDate?: string, endDate?: string):
 export async function getDailyRevenue(startDate: string, endDate: string): Promise<DailyRevenue[]> {
   const { data, error } = await supabase
     .from('service_orders')
-    .select('approved_at, total_cost, discount_amount, budget_approved')
+    .select('approved_at, total_cost, budget_approved')
     .gte('approved_at', startDate)
     .lte('approved_at', endDate)
     .eq('budget_approved', true)
@@ -1245,8 +1258,7 @@ export async function getDailyRevenue(startDate: string, endDate: string): Promi
     
     const date = new Date(order.approved_at).toISOString().split('T')[0];
     const cost = Number(order.total_cost) || 0;
-    const discount = Number(order.discount_amount) || 0;
-    const revenue = cost - discount;
+    const revenue = cost;
 
     if (dailyMap.has(date)) {
       const existing = dailyMap.get(date)!;
@@ -1275,7 +1287,7 @@ export async function getMonthlyRevenue(year?: number): Promise<MonthlyRevenue[]
 
   const { data, error } = await supabase
     .from('service_orders')
-    .select('approved_at, total_cost, discount_amount, budget_approved')
+    .select('approved_at, total_cost, budget_approved')
     .gte('approved_at', startDate)
     .lte('approved_at', endDate)
     .eq('budget_approved', true)
@@ -1297,8 +1309,7 @@ export async function getMonthlyRevenue(year?: number): Promise<MonthlyRevenue[]
     // Extract: "2026-01"
     const month = order.approved_at.substring(0, 7); // Gets "YYYY-MM"
     const cost = Number(order.total_cost) || 0;
-    const discount = Number(order.discount_amount) || 0;
-    const revenue = cost - discount;
+    const revenue = cost;
 
     if (monthlyMap.has(month)) {
       const existing = monthlyMap.get(month)!;
@@ -2200,8 +2211,7 @@ export async function getClientStats(clientId: string) {
     );
     const totalRevenue = revenueOrders.reduce((sum, order) => {
       const total = Number(order.total_cost) || 0;
-      const discount = Number(order.discount_amount) || 0;
-      return sum + (total - discount);
+      return sum + total;
     }, 0);
 
     // Calcular tempo médio de reparo (em dias)

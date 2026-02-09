@@ -65,6 +65,10 @@ export default function BudgetApproval() {
     setError(null);
 
     try {
+      const subtotal = (order.labor_cost || 0) + (order.parts_cost || 0);
+      const discountAmount = order.discount_amount || 0;
+      const totalFinal = Math.max(subtotal - discountAmount, 0);
+
       // Save to approval history first
       const { error: historyError } = await supabase
         .from('approval_history')
@@ -73,6 +77,10 @@ export default function BudgetApproval() {
           labor_cost: order.labor_cost,
           parts_cost: order.parts_cost,
           total_cost: order.total_cost,
+          subtotal_cost: subtotal,
+          discount_amount: discountAmount,
+          discount_reason: order.discount_reason,
+          total_final_cost: totalFinal,
           approved_at: new Date().toISOString(),
           notes: 'Orçamento aprovado pelo cliente via link de aprovação',
           admin_notified: false, // Admin needs to be notified
@@ -94,7 +102,7 @@ export default function BudgetApproval() {
       if (updateError) throw updateError;
 
       // Create status history entry with budget details
-      const budgetDetails = `Mão de Obra: R$ ${order.labor_cost?.toFixed(2).replace('.', ',')} | Peças: R$ ${order.parts_cost?.toFixed(2).replace('.', ',')} | Total: R$ ${order.total_cost?.toFixed(2).replace('.', ',')}`;
+      const budgetDetails = `Mão de Obra: R$ ${order.labor_cost?.toFixed(2).replace('.', ',')} | Peças: R$ ${order.parts_cost?.toFixed(2).replace('.', ',')} | Subtotal: R$ ${subtotal.toFixed(2).replace('.', ',')} | Desconto: R$ ${discountAmount.toFixed(2).replace('.', ',')} | Total final: R$ ${totalFinal.toFixed(2).replace('.', ',')}`;
       const { error: statusError } = await supabase
         .from('order_status_history')
         .insert({
@@ -321,12 +329,28 @@ export default function BudgetApproval() {
                   </span>
                 </div>
               )}
+
+              <div className="flex justify-between items-center pt-2 border-t border-primary/30">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-semibold text-lg">
+                  R$ {((order.labor_cost || 0) + (order.parts_cost || 0)).toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+
+              {(order.discount_amount || 0) > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Desconto</span>
+                  <span className="font-semibold text-lg text-orange-600">
+                    - R$ {(order.discount_amount || 0).toFixed(2).replace('.', ',')}
+                  </span>
+                </div>
+              )}
               
               <div className="pt-3 border-t-2 border-primary/30">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-lg">Valor Total</span>
+                  <span className="font-bold text-lg">Total Final</span>
                   <span className="font-bold text-2xl text-primary">
-                    R$ {(order.total_cost || 0).toFixed(2).replace('.', ',')}
+                    R$ {Math.max(((order.labor_cost || 0) + (order.parts_cost || 0)) - (order.discount_amount || 0), 0).toFixed(2).replace('.', ',')}
                   </span>
                 </div>
               </div>
