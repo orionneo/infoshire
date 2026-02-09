@@ -95,6 +95,10 @@ export default function ClientOrderDetail() {
     
     setApproving(true);
     try {
+      const subtotal = (order.labor_cost || 0) + (order.parts_cost || 0);
+      const discountAmount = order.discount_amount || 0;
+      const totalFinal = Math.max(subtotal - discountAmount, 0);
+
       // Save to approval history
       const { error: historyError } = await supabase
         .from('approval_history')
@@ -103,6 +107,10 @@ export default function ClientOrderDetail() {
           labor_cost: order.labor_cost,
           parts_cost: order.parts_cost,
           total_cost: order.total_cost,
+          subtotal_cost: subtotal,
+          discount_amount: discountAmount,
+          discount_reason: order.discount_reason,
+          total_final_cost: totalFinal,
           approved_at: new Date().toISOString(),
           notes: `Orçamento aprovado pelo cliente`,
         });
@@ -122,7 +130,7 @@ export default function ClientOrderDetail() {
       if (error) throw error;
 
       // Create status history entry with budget details
-      const budgetDetails = `Mão de Obra: R$ ${order.labor_cost?.toFixed(2).replace('.', ',')} | Peças: R$ ${order.parts_cost?.toFixed(2).replace('.', ',')} | Total: R$ ${order.total_cost?.toFixed(2).replace('.', ',')}`;
+      const budgetDetails = `Mão de Obra: R$ ${order.labor_cost?.toFixed(2).replace('.', ',')} | Peças: R$ ${order.parts_cost?.toFixed(2).replace('.', ',')} | Subtotal: R$ ${subtotal.toFixed(2).replace('.', ',')} | Desconto: R$ ${discountAmount.toFixed(2).replace('.', ',')} | Total final: R$ ${totalFinal.toFixed(2).replace('.', ',')}`;
       const { error: statusHistoryError } = await supabase
         .from('order_status_history')
         .insert({
@@ -225,6 +233,10 @@ export default function ClientOrderDetail() {
       </ClientLayout>
     );
   }
+
+  const subtotal = (order.labor_cost || 0) + (order.parts_cost || 0);
+  const discountAmount = order.discount_amount || 0;
+  const totalFinal = Math.max(subtotal - discountAmount, 0);
 
   return (
     <ClientLayout>
@@ -359,9 +371,23 @@ export default function ClientOrderDetail() {
                     </div>
                   )}
                   <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="font-bold">Total</span>
+                    <span className="text-sm text-muted-foreground">Subtotal</span>
+                    <span className="font-medium">
+                      R$ {subtotal.toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Desconto</span>
+                      <span className="font-medium text-orange-600">
+                        - R$ {discountAmount.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <span className="font-bold">Total final</span>
                     <span className="font-bold text-xl text-primary">
-                      R$ {order.total_cost.toFixed(2).replace('.', ',')}
+                      R$ {totalFinal.toFixed(2).replace('.', ',')}
                     </span>
                   </div>
                   {order.budget_notes && (
@@ -423,7 +449,12 @@ export default function ClientOrderDetail() {
                 <div className="pt-4 border-t space-y-3">
                   <h3 className="font-semibold text-lg">Histórico de Aprovações</h3>
                   <div className="space-y-3">
-                    {approvalHistory.map((approval, index) => (
+                    {approvalHistory.map((approval, index) => {
+                      const approvalSubtotal = approval.subtotal_cost ?? (approval.labor_cost || 0) + (approval.parts_cost || 0);
+                      const approvalDiscount = approval.discount_amount || 0;
+                      const approvalTotalFinal = approval.total_final_cost ?? approval.total_cost ?? Math.max(approvalSubtotal - approvalDiscount, 0);
+
+                      return (
                       <div key={approval.id} className="p-3 bg-muted rounded-lg space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">Aprovação #{approvalHistory.length - index}</span>
@@ -442,10 +473,22 @@ export default function ClientOrderDetail() {
                               <span>R$ {approval.parts_cost.toFixed(2).replace('.', ',')}</span>
                             </div>
                           )}
-                          {approval.total_cost && (
+                          {approvalSubtotal > 0 && (
+                            <div className="flex justify-between pt-1 border-t border-border">
+                              <span className="text-muted-foreground">Subtotal</span>
+                              <span>R$ {approvalSubtotal.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                          )}
+                          {approvalDiscount > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Desconto</span>
+                              <span>- R$ {approvalDiscount.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                          )}
+                          {approvalTotalFinal > 0 && (
                             <div className="flex justify-between font-semibold pt-1 border-t border-border">
-                              <span>Total</span>
-                              <span className="text-primary">R$ {approval.total_cost.toFixed(2).replace('.', ',')}</span>
+                              <span>Total final</span>
+                              <span className="text-primary">R$ {approvalTotalFinal.toFixed(2).replace('.', ',')}</span>
                             </div>
                           )}
                         </div>
@@ -458,7 +501,8 @@ export default function ClientOrderDetail() {
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   
                   {/* Total Consolidado */}
@@ -467,7 +511,7 @@ export default function ClientOrderDetail() {
                       <div className="flex justify-between items-center">
                         <span className="font-bold text-lg">Total Consolidado</span>
                         <span className="font-bold text-2xl text-primary">
-                          R$ {approvalHistory.reduce((sum, a) => sum + (a.total_cost || 0), 0).toFixed(2).replace('.', ',')}
+                          R$ {approvalHistory.reduce((sum, a) => sum + (a.total_final_cost ?? a.total_cost ?? 0), 0).toFixed(2).replace('.', ',')}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">

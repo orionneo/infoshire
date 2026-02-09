@@ -62,6 +62,12 @@ const buildWhatsAppUrl = (phone: string | null | undefined, message: string) => 
   return phoneNumber ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}` : '';
 };
 
+const getSubtotal = (laborCost: number | null | undefined, partsCost: number | null | undefined) =>
+  (laborCost || 0) + (partsCost || 0);
+
+const getTotalFinal = (subtotal: number, discountAmount: number | null | undefined) =>
+  Math.max(subtotal - (discountAmount || 0), 0);
+
 export default function AdminOrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -314,7 +320,9 @@ export default function AdminOrderDetail() {
     const isNotApproved = data.status === 'not_approved';
     const laborCost = isAwaitingApproval ? parseFloat(data.labor_cost) || 0 : 0;
     const partsCost = isAwaitingApproval ? parseFloat(data.parts_cost) || 0 : 0;
-    const totalCost = laborCost + partsCost;
+    const subtotal = laborCost + partsCost;
+    const discountAmount = order.discount_amount || 0;
+    const totalFinal = getTotalFinal(subtotal, discountAmount);
     const newApprovalToken = isAwaitingApproval ? crypto.randomUUID() : '';
     const approvalUrl = newApprovalToken ? `${window.location.origin}/approve/${newApprovalToken}` : '';
     const { budgetRequestTemplate, readyForPickupTemplate, notApprovedTemplate, businessAddress, businessHours } = whatsappSettings;
@@ -324,7 +332,9 @@ export default function AdminOrderDetail() {
       if (isAwaitingApproval && budgetRequestTemplate) {
         const formattedLaborCost = laborCost.toFixed(2).replace('.', ',');
         const formattedPartsCost = partsCost.toFixed(2).replace('.', ',');
-        const formattedTotalCost = totalCost.toFixed(2).replace('.', ',');
+        const formattedSubtotal = subtotal.toFixed(2).replace('.', ',');
+        const formattedDiscount = discountAmount.toFixed(2).replace('.', ',');
+        const formattedTotalFinal = totalFinal.toFixed(2).replace('.', ',');
         const formattedObservations = data.budget_notes
           ? `📝 *Observações:*\n${data.budget_notes}\n\n`
           : '';
@@ -335,7 +345,9 @@ export default function AdminOrderDetail() {
           .replace(/{equipamento}/g, order.equipment)
           .replace(/{valor_mao_obra}/g, formattedLaborCost)
           .replace(/{valor_pecas}/g, formattedPartsCost)
-          .replace(/{valor_total}/g, formattedTotalCost)
+          .replace(/{valor_total}/g, formattedSubtotal)
+          .replace(/{desconto}/g, discountAmount > 0 ? `🎁 *Desconto aplicado:* R$ ${formattedDiscount}\n` : '')
+          .replace(/{valor_final}/g, discountAmount > 0 ? `✨ *Valor final:* R$ ${formattedTotalFinal}\n\n` : '')
           .replace(/{observacoes}/g, formattedObservations)
           .replace(/{link_aprovacao}/g, approvalUrl);
 
@@ -354,7 +366,7 @@ export default function AdminOrderDetail() {
           .replace(/{business_hours}/g, businessHours)
           .replace(/{valor_total}/g, order.total_cost ? `💰 *Valor total:* R$ ${order.total_cost.toFixed(2).replace('.', ',')}\n` : '')
           .replace(/{desconto}/g, order.discount_amount && order.discount_amount > 0 ? `🎁 *Desconto aplicado:* R$ ${order.discount_amount.toFixed(2).replace('.', ',')}\n` : '')
-          .replace(/{valor_final}/g, order.discount_amount && order.discount_amount > 0 && order.total_cost ? `✨ *Valor final:* R$ ${(order.total_cost - order.discount_amount).toFixed(2).replace('.', ',')}\n\n` : '')
+          .replace(/{valor_final}/g, order.discount_amount && order.discount_amount > 0 && order.total_cost ? `✨ *Valor final:* R$ ${order.total_cost.toFixed(2).replace('.', ',')}\n\n` : '')
           .replace(/{observacoes}/g, data.notes ? `📝 *Observações:*\n${data.notes}\n\n` : '');
 
         whatsappUrl = buildWhatsAppUrl(order.client.phone, whatsappMessage);
@@ -390,7 +402,7 @@ export default function AdminOrderDetail() {
           status: data.status,
           labor_cost: laborCost,
           parts_cost: partsCost,
-          total_cost: totalCost,
+          total_cost: totalFinal,
           budget_notes: data.budget_notes || null,
           approval_token: newApprovalToken,
           budget_approved: false, // Reset approval status for new budget
@@ -407,7 +419,9 @@ Seu orçamento para o reparo do equipamento *${order.equipment}* está pronto:
 💰 *Detalhamento do Orçamento:*
 ${laborCost > 0 ? `• Mão de Obra: R$ ${laborCost.toFixed(2).replace('.', ',')}` : ''}
 ${partsCost > 0 ? `• Peças: R$ ${partsCost.toFixed(2).replace('.', ',')}` : ''}
-• *TOTAL: R$ ${totalCost.toFixed(2).replace('.', ',')}*
+• *Subtotal: R$ ${subtotal.toFixed(2).replace('.', ',')}*
+${discountAmount > 0 ? `• Desconto: R$ ${discountAmount.toFixed(2).replace('.', ',')}` : ''}
+• *Total final: R$ ${totalFinal.toFixed(2).replace('.', ',')}*
 
 ${data.budget_notes ? `📝 *Observações:*\n${data.budget_notes}\n\n` : ''}✅ *Para aprovar o orçamento, clique no link abaixo:*
 ${approvalUrl}
@@ -463,7 +477,7 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
             .replace(/{business_hours}/g, businessHours)
             .replace(/{valor_total}/g, order.total_cost ? `💰 *Valor total:* R$ ${order.total_cost.toFixed(2).replace('.', ',')}\n` : '')
             .replace(/{desconto}/g, order.discount_amount && order.discount_amount > 0 ? `🎁 *Desconto aplicado:* R$ ${order.discount_amount.toFixed(2).replace('.', ',')}\n` : '')
-            .replace(/{valor_final}/g, order.discount_amount && order.discount_amount > 0 && order.total_cost ? `✨ *Valor final:* R$ ${(order.total_cost - order.discount_amount).toFixed(2).replace('.', ',')}\n\n` : '')
+            .replace(/{valor_final}/g, order.discount_amount && order.discount_amount > 0 && order.total_cost ? `✨ *Valor final:* R$ ${order.total_cost.toFixed(2).replace('.', ',')}\n\n` : '')
             .replace(/{observacoes}/g, data.notes ? `📝 *Observações:*\n${data.notes}\n\n` : '');
 
           await createMessage({
@@ -614,16 +628,7 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
         return;
       }
 
-      if (discountAmount > 0 && !data.discount_reason.trim()) {
-        toast({
-          title: 'Erro',
-          description: 'O motivo do desconto é obrigatório',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      await updateServiceOrderDiscount(id, discountAmount, data.discount_reason);
+      await updateServiceOrderDiscount(id, discountAmount, data.discount_reason.trim());
 
       toast({
         title: 'Desconto atualizado',
@@ -666,6 +671,10 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
       </AdminLayout>
     );
   }
+
+  const subtotal = getSubtotal(order.labor_cost, order.parts_cost);
+  const discountAmount = order.discount_amount || 0;
+  const totalFinal = getTotalFinal(subtotal, discountAmount);
 
   return (
     <AdminLayout>
@@ -1140,7 +1149,12 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
                 <div className="pt-3 border-t space-y-3">
                   <h3 className="font-semibold text-base">Histórico de Aprovações</h3>
                   <div className="space-y-2">
-                    {approvalHistory.map((approval, index) => (
+                    {approvalHistory.map((approval, index) => {
+                      const approvalSubtotal = approval.subtotal_cost ?? getSubtotal(approval.labor_cost, approval.parts_cost);
+                      const approvalDiscount = approval.discount_amount || 0;
+                      const approvalTotalFinal = approval.total_final_cost ?? approval.total_cost ?? getTotalFinal(approvalSubtotal, approvalDiscount);
+
+                      return (
                       <div key={approval.id} className="p-2 bg-muted rounded-lg space-y-1.5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -1189,10 +1203,24 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
                               <span>R$ {approval.parts_cost.toFixed(2).replace('.', ',')}</span>
                             </div>
                           )}
-                          {approval.total_cost && (
+                          {approvalSubtotal > 0 && (
+                            <div className="flex justify-between pt-0.5 border-t border-border">
+                              <span className="text-muted-foreground">Subtotal</span>
+                              <span>R$ {approvalSubtotal.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                          )}
+                          {approvalDiscount > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Desconto</span>
+                              <span>- R$ {approvalDiscount.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                          )}
+                          {approvalTotalFinal > 0 && (
                             <div className="flex justify-between font-semibold pt-0.5 border-t border-border">
-                              <span>Total</span>
-                              <span className="text-primary">R$ {approval.total_cost.toFixed(2).replace('.', ',')}</span>
+                              <span>Total final</span>
+                              <span className="text-primary">
+                                R$ {approvalTotalFinal.toFixed(2).replace('.', ',')}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -1200,7 +1228,8 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
                           {format(new Date(approval.approved_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   
                   {/* Total Consolidado */}
@@ -1209,7 +1238,7 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
                       <div className="flex justify-between items-center">
                         <span className="font-bold text-sm">Total Consolidado</span>
                         <span className="font-bold text-lg text-primary">
-                          R$ {approvalHistory.reduce((sum, a) => sum + (a.total_cost || 0), 0).toFixed(2).replace('.', ',')}
+                          R$ {approvalHistory.reduce((sum, a) => sum + (a.total_final_cost ?? a.total_cost ?? 0), 0).toFixed(2).replace('.', ',')}
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -1220,125 +1249,109 @@ Após a aprovação, daremos continuidade ao reparo imediatamente! 🔧`;
                 </div>
               )}
 
-              {/* Seção de Desconto */}
-              {approvalHistory.length > 0 && (
-                <div className="pt-3 border-t space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-base">Desconto</h3>
-                    <Dialog open={discountDialogOpen} onOpenChange={setDiscountDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8">
-                          <Tag className="h-3 w-3 mr-1" />
-                          {order.discount_amount && order.discount_amount > 0 ? 'Editar' : 'Aplicar'}
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Aplicar Desconto</DialogTitle>
-                        </DialogHeader>
-                        <Form {...discountForm}>
-                          <form onSubmit={discountForm.handleSubmit(handleDiscountSubmit)} className="space-y-4">
-                            <FormField
-                              control={discountForm.control}
-                              name="discount_amount"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Valor do Desconto (R$)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      placeholder="0,00"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
+              {/* Resumo Financeiro */}
+              <div className="pt-3 border-t space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-base">Resumo Financeiro</h3>
+                  <Dialog open={discountDialogOpen} onOpenChange={setDiscountDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8">
+                        <Tag className="h-3 w-3 mr-1" />
+                        {discountAmount > 0 ? 'Editar' : 'Aplicar'}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Aplicar Desconto</DialogTitle>
+                      </DialogHeader>
+                      <Form {...discountForm}>
+                        <form onSubmit={discountForm.handleSubmit(handleDiscountSubmit)} className="space-y-4">
+                          <FormField
+                            control={discountForm.control}
+                            name="discount_amount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Valor do Desconto (R$)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0,00"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={discountForm.control}
+                            name="discount_reason"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Motivo do Desconto (opcional)</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Descreva o motivo do desconto..."
+                                    className="min-h-[100px]"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setDiscountDialogOpen(false)}
+                              disabled={updating}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button type="submit" disabled={updating}>
+                              {updating ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Salvando...
+                                </>
+                              ) : (
+                                'Aplicar Desconto'
                               )}
-                            />
-                            <FormField
-                              control={discountForm.control}
-                              name="discount_reason"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Motivo do Desconto</FormLabel>
-                                  <FormControl>
-                                    <Textarea
-                                      placeholder="Descreva o motivo do desconto..."
-                                      className="min-h-[100px]"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="flex gap-2 justify-end">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setDiscountDialogOpen(false)}
-                                disabled={updating}
-                              >
-                                Cancelar
-                              </Button>
-                              <Button type="submit" disabled={updating}>
-                                {updating ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Salvando...
-                                  </>
-                                ) : (
-                                  'Aplicar Desconto'
-                                )}
-                              </Button>
-                            </div>
-                          </form>
-                        </Form>
-                      </DialogContent>
-                    </Dialog>
+                            </Button>
+                          </div>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>R$ {subtotal.toFixed(2).replace('.', ',')}</span>
                   </div>
-
-                  {order.discount_amount && order.discount_amount > 0 ? (
-                    <div className="space-y-2">
-                      <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium text-orange-900 dark:text-orange-100">Desconto Aplicado</span>
-                          <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
-                            - R$ {order.discount_amount.toFixed(2).replace('.', ',')}
-                          </span>
-                        </div>
-                        {order.discount_reason && (
-                          <p className="text-xs text-orange-800 dark:text-orange-200 mt-1">
-                            <span className="font-medium">Motivo:</span> {order.discount_reason}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Valor Final */}
-                      <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border-2 border-green-500 dark:border-green-700">
-                        <div className="flex justify-between items-center">
-                          <span className="font-bold text-sm text-green-900 dark:text-green-100">Valor Final</span>
-                          <span className="font-bold text-lg text-green-600 dark:text-green-400">
-                            R$ {(
-                              approvalHistory.reduce((sum, a) => sum + (a.total_cost || 0), 0) - 
-                              (order.discount_amount || 0)
-                            ).toFixed(2).replace('.', ',')}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-green-800 dark:text-green-200 mt-0.5">
-                          Total consolidado com desconto aplicado
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center py-2">
-                      Nenhum desconto aplicado
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Desconto</span>
+                    <span className={discountAmount > 0 ? 'text-orange-600' : ''}>
+                      {discountAmount > 0 ? `- R$ ${discountAmount.toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center font-semibold pt-1 border-t border-border">
+                    <span>Total final</span>
+                    <span className="text-green-600 dark:text-green-400">
+                      R$ {totalFinal.toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                  {order.discount_reason && (
+                    <p className="text-[10px] text-muted-foreground">
+                      <span className="font-medium">Motivo:</span> {order.discount_reason}
                     </p>
                   )}
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
 

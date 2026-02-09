@@ -283,16 +283,18 @@ export default function AdminFinancial() {
           </thead>
           <tbody>
             ${orders.map(order => {
-              const total = Number(order.total_cost) || 0;
+              const labor = Number(order.labor_cost) || 0;
+              const parts = Number(order.parts_cost) || 0;
+              const subtotal = labor + parts;
               const discount = Number(order.discount_amount) || 0;
-              const final = total - discount;
+              const final = Number(order.total_cost) || Math.max(subtotal - discount, 0);
               return `
                 <tr>
                   <td>${order.order_number}</td>
                   <td>${order.client?.name || 'N/A'}</td>
                   <td>${order.equipment}</td>
                   <td>${order.approved_at ? format(new Date(order.approved_at), 'dd/MM/yyyy', { locale: ptBR }) : 'N/A'}</td>
-                  <td>R$ ${total.toFixed(2).replace('.', ',')}</td>
+                  <td>R$ ${subtotal.toFixed(2).replace('.', ',')}</td>
                   <td>R$ ${discount.toFixed(2).replace('.', ',')}</td>
                   <td>R$ ${final.toFixed(2).replace('.', ',')}</td>
                 </tr>
@@ -670,9 +672,11 @@ export default function AdminFinancial() {
                     <TableBody>
                       {orders.length > 0 ? (
                         orders.map((order) => {
-                          const total = Number(order.total_cost) || 0;
+                          const labor = Number(order.labor_cost) || 0;
+                          const parts = Number(order.parts_cost) || 0;
+                          const subtotal = labor + parts;
                           const discount = Number(order.discount_amount) || 0;
-                          const final = total - discount;
+                          const final = Number(order.total_cost) || Math.max(subtotal - discount, 0);
 
                           return (
                             <TableRow key={order.id}>
@@ -684,7 +688,7 @@ export default function AdminFinancial() {
                                   ? format(new Date(order.approved_at), 'dd/MM/yyyy', { locale: ptBR })
                                   : 'N/A'}
                               </TableCell>
-                              <TableCell className="text-right">{formatCurrency(total)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
                               <TableCell className="text-right text-orange-600">
                                 {discount > 0 ? `-${formatCurrency(discount)}` : '-'}
                               </TableCell>

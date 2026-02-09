@@ -104,6 +104,10 @@ export type ApprovalHistory = {
   labor_cost: number | null;
   parts_cost: number | null;
   total_cost: number | null;
+  subtotal_cost: number | null;
+  discount_amount: number | null;
+  discount_reason: string | null;
+  total_final_cost: number | null;
   approved_at: string;
   client_ip: string | null;
   notes: string | null;
