@@ -184,7 +184,7 @@ export default function Home() {
               <Button
                 size="lg"
                 onClick={() => navigate('/register')}
-                className="text-lg px-8 py-6 bg-primary/15 hover:bg-primary/25 text-primary font-semibold border border-primary/40 hover:border-primary hover:scale-105 transition-all duration-300"
+                className="text-lg px-8 py-6 bg-primary/15 hover:bg-primary/25 text-foreground font-semibold border border-primary/40 hover:border-primary hover:scale-105 transition-all duration-300"
               >
                 Cadastrar Agora
               </Button>
