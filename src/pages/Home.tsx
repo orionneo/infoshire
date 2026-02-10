@@ -131,15 +131,32 @@ export default function Home() {
               <div className="w-full max-w-lg xl:max-w-3xl relative px-4">
                 <div className="absolute inset-0 bg-primary/20 blur-3xl animate-pulse"></div>
                 <div className="relative">
+                  {/* overlay premium mascarado pelo PNG (sem quadrado) */}
                   <div
-                    className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.06] mix-blend-overlay"
+                    className="logo-mask-overlay pointer-events-none absolute inset-0"
                     style={{
-                      backgroundImage:
-                        'radial-gradient(circle at 20% 10%, rgba(255,255,255,0.35), transparent 35%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.22), transparent 40%), radial-gradient(circle at 30% 80%, rgba(255,255,255,0.18), transparent 45%)',
+                      WebkitMaskImage: `url(${logoInfoshire})`,
+                      maskImage: `url(${logoInfoshire})`,
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskRepeat: 'no-repeat',
+                      WebkitMaskPosition: 'center',
+                      maskPosition: 'center',
+                      WebkitMaskSize: 'contain',
+                      maskSize: 'contain',
                     }}
-                  />
-                  <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                    <div className="sheen-premium" />
+                  >
+                    {/* micro-grain ultra sutil */}
+                    <div
+                      className="absolute inset-0 opacity-[0.045] mix-blend-overlay"
+                      style={{
+                        backgroundImage:
+                          'radial-gradient(circle at 20% 10%, rgba(255,255,255,0.28), transparent 40%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.16), transparent 45%), radial-gradient(circle at 30% 80%, rgba(255,255,255,0.12), transparent 52%)',
+                      }}
+                    />
+                    {/* sheen */}
+                    <div className="absolute inset-0 overflow-hidden">
+                      <div className="sheen-premium" />
+                    </div>
                   </div>
 
                   <LogoEdgeSparkles
