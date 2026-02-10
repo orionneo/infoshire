@@ -5,8 +5,52 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type RawReview = {
+  author_name?: string;
+  rating?: number;
+  text?: string;
+  time?: number;
+  profile_photo_url?: string;
+};
+
+type CacheRow = {
+  place_id: string;
+  rating: number;
+  user_ratings_total: number;
+  reviews: RawReview[] | null;
+  cached_at: string;
+};
+
+const normalizeReview = (review: RawReview) => ({
+  author_name: String(review.author_name || 'Cliente').trim() || 'Cliente',
+  rating: Number(review.rating || 0),
+  text: String(review.text || ''),
+  time: Number(review.time || 0),
+  profile_photo_url: String(review.profile_photo_url || ''),
+});
+
+const consolidateReviews = (rows: CacheRow[]) => {
+  const uniqueReviews = new Map<string, ReturnType<typeof normalizeReview>>();
+
+  for (const row of rows) {
+    const reviews = Array.isArray(row.reviews) ? row.reviews : [];
+
+    for (const review of reviews) {
+      const normalized = normalizeReview(review);
+      const dedupeKey = `${normalized.author_name}|${normalized.time}|${normalized.rating}|${(normalized.text || '').slice(0, 40)}`;
+
+      if (!uniqueReviews.has(dedupeKey)) {
+        uniqueReviews.set(dedupeKey, normalized);
+      }
+    }
+  }
+
+  return Array.from(uniqueReviews.values())
+    .sort((a, b) => b.time - a.time)
+    .slice(0, 10);
+};
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -21,31 +65,32 @@ Deno.serve(async (req) => {
     const PLACE_ID = 'ChIJkW1-ktLHyJQRyPqg9BtxflA';
     const CACHE_HOURS = 12;
 
-    // Verificar se existe cache válido
-    const { data: cachedData, error: cacheError } = await supabase
+    const { data: cachedRows, error: cacheError } = await supabase
       .from('google_reviews_cache')
       .select('*')
       .eq('place_id', PLACE_ID)
       .order('cached_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(20);
 
-    if (!cacheError && cachedData) {
-      const cacheAge = Date.now() - new Date(cachedData.cached_at).getTime();
-      const cacheAgeHours = cacheAge / (1000 * 60 * 60);
+    const cacheRows = !cacheError && Array.isArray(cachedRows) ? (cachedRows as CacheRow[]) : [];
 
-      // Se o cache ainda é válido, retornar dados em cache
-      if (cacheAgeHours < CACHE_HOURS) {
+    if (cacheRows.length > 0) {
+      const latest = cacheRows[0];
+      const ageHours = (Date.now() - new Date(latest.cached_at).getTime()) / (1000 * 60 * 60);
+      const reviewsConsolidated = consolidateReviews(cacheRows);
+
+      if (ageHours < CACHE_HOURS) {
         return new Response(
           JSON.stringify({
             success: true,
             data: {
-              rating: cachedData.rating,
-              user_ratings_total: cachedData.user_ratings_total,
-              reviews: cachedData.reviews,
+              rating: latest.rating,
+              user_ratings_total: latest.user_ratings_total,
+              reviews: reviewsConsolidated,
             },
             cached: true,
-            cache_age_hours: cacheAgeHours.toFixed(2),
+            cache_age_hours: Number(ageHours.toFixed(2)),
+            cached_at: latest.cached_at,
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -55,7 +100,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Se não houver API key, retornar dados de exemplo
     if (!googleApiKey) {
       const exampleData = {
         rating: 4.8,
@@ -113,7 +157,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Buscar dados do Google Places API
     const placeDetailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${PLACE_ID}&fields=rating,user_ratings_total,reviews&key=${googleApiKey}&language=pt-BR`;
 
     const response = await fetch(placeDetailsUrl);
@@ -124,14 +167,14 @@ Deno.serve(async (req) => {
     }
 
     const result = data.result;
+    const nowIso = new Date().toISOString();
 
-    // Salvar no cache
     await supabase.from('google_reviews_cache').insert({
       place_id: PLACE_ID,
       rating: result.rating,
       user_ratings_total: result.user_ratings_total,
       reviews: result.reviews || [],
-      cached_at: new Date().toISOString(),
+      cached_at: nowIso,
     });
 
     return new Response(
@@ -143,6 +186,7 @@ Deno.serve(async (req) => {
           reviews: result.reviews || [],
         },
         cached: false,
+        cached_at: nowIso,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

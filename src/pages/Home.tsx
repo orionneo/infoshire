@@ -20,8 +20,30 @@ type ProcessStep = {
   highlight?: boolean;
 };
 
+type ReviewsSummary = {
+  rating: number;
+  totalReviews: number;
+  cached?: boolean;
+  cacheAgeHours?: number;
+  cachedAt?: string | null;
+};
+
 export default function Home() {
   const navigate = useNavigate();
+  const [googleSummary, setGoogleSummary] = useState<ReviewsSummary>({
+    rating: 4.9,
+    totalReviews: 600,
+    cached: undefined,
+    cacheAgeHours: undefined,
+    cachedAt: null,
+  });
+
+  const formattedRating = Number.isFinite(googleSummary.rating)
+    ? googleSummary.rating.toFixed(1)
+    : '4.9';
+  const formattedTotalReviews = `${new Intl.NumberFormat('pt-BR').format(
+    Number.isFinite(googleSummary.totalReviews) ? googleSummary.totalReviews : 600,
+  )}+`;
 
   // Features highlighting InfoShire's strengths
   const features = [
@@ -185,7 +207,7 @@ export default function Home() {
               </svg>
               <div className="text-left">
                 <div className="flex items-center gap-2">
-                  <span className="text-3xl font-bold text-primary">4.9</span>
+                  <span className="text-3xl font-bold text-primary">{formattedRating}</span>
                   <div className="flex">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <svg key={star} className="h-5 w-5 text-yellow-400 fill-current" viewBox="0 0 20 20">
@@ -195,7 +217,7 @@ export default function Home() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  <span className="font-bold text-primary">600+</span> avaliações reais
+                  <span className="font-bold text-primary">{formattedTotalReviews}</span> avaliações reais
                 </p>
               </div>
             </div>
@@ -241,7 +263,7 @@ export default function Home() {
             </p>
           </div>
 
-          <ProcessFlow steps={processSteps} />
+          <ProcessFlowArrows steps={processSteps} />
         </div>
       </section>
       {/* Features Section */}
@@ -303,6 +325,8 @@ export default function Home() {
                     <img
                       src={service.image}
                       alt={service.title}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover"
                       style={{ filter: 'saturate(1.15) contrast(1.08)' }}
                     />
@@ -358,7 +382,7 @@ export default function Home() {
                 </svg>
                 <div className="text-left">
                   <div className="flex items-center gap-2">
-                    <span className="text-4xl font-bold text-primary">4.9</span>
+                    <span className="text-4xl font-bold text-primary">{formattedRating}</span>
                     <div className="flex">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <svg key={star} className="h-6 w-6 text-yellow-400 fill-current" viewBox="0 0 20 20">
@@ -367,7 +391,7 @@ export default function Home() {
                       ))}
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">Baseado em <span className="font-bold text-primary">600+</span> avaliações</p>
+                  <p className="text-sm text-muted-foreground">Baseado em <span className="font-bold text-primary">{formattedTotalReviews}</span> avaliações</p>
                 </div>
               </div>
               <h2 className="text-3xl xl:text-5xl font-bold mb-4">
@@ -379,7 +403,13 @@ export default function Home() {
             </div>
 
             {/* Reviews Carousel */}
-            <ReviewsCarousel />
+            <ReviewsCarousel onSummary={setGoogleSummary} />
+
+            <p className="text-center text-xs text-muted-foreground mt-4">
+              {googleSummary.cached
+                ? `Atualizado há ~${googleSummary.cacheAgeHours?.toFixed(2) ?? 0}h (cache)`
+                : 'Atualizado agora'}
+            </p>
 
             {/* Google Maps Verified Reviews Integration */}
             <div className="mt-16">
@@ -528,7 +558,7 @@ function HeroProcessMini() {
   );
 }
 
-function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
+function ProcessFlowArrows({ steps }: { steps: ProcessStep[] }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
@@ -697,43 +727,47 @@ function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
         </div>
       </div>
 
-      <div className="hidden md:grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-          const isActive = index === currentStep;
-          return (
-            <Card
-              key={step.title}
-              className={`relative bg-card/50 backdrop-blur border-border transition-all duration-300 hover-lift ${
-                isActive ? 'border-primary/70 shadow-[0_0_25px_rgba(139,255,0,0.3)] scale-[1.02]' : 'hover:border-primary/60'
-              }`}
-            >
-              <CardContent className="p-6 flex flex-col gap-4">
-                <div className="flex items-start justify-between">
-                  <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
-                    <Icon className="h-7 w-7 text-primary" />
-                  </div>
-                  {step.highlight && (
-                    <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
-                      Diferencial InfoShire
-                    </span>
+      <div className="hidden md:block">
+        <div className="overflow-x-auto pb-2">
+          <div className="flex items-stretch gap-4 snap-x snap-mandatory">
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+
+              return (
+                <React.Fragment key={step.title}>
+                  <Card className="min-w-[340px] max-w-[340px] snap-start bg-card/50 backdrop-blur border-border hover:border-primary/60 transition-all duration-300">
+                    <CardContent className="p-6 flex flex-col gap-4">
+                      <div className="flex items-start justify-between">
+                        <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
+                          <Icon className="h-7 w-7 text-primary" />
+                        </div>
+                        <div className="h-8 w-8 rounded-full border border-primary/40 bg-primary/10 text-primary text-sm font-bold flex items-center justify-center">
+                          {index + 1}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {step.description}
+                        </p>
+                      </div>
+                      {step.highlight && (
+                        <span className="text-[10px] w-fit uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
+                          Diferencial InfoShire
+                        </span>
+                      )}
+                    </CardContent>
+                  </Card>
+                  {index < steps.length - 1 && (
+                    <div className="flex items-center justify-center px-1 text-primary/70">
+                      <ChevronRight className="h-6 w-6" />
+                    </div>
                   )}
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {step.description}
-                  </p>
-                </div>
-                {isActive && (
-                  <div className="mt-2 text-xs uppercase tracking-wide text-primary">
-                    Em destaque agora
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -742,15 +776,24 @@ function ProcessFlow({ steps }: { steps: ProcessStep[] }) {
 // Componente de Integração do Google Maps Reviews
 
 // Componente de Carrossel de Avaliações
-function ReviewsCarousel() {
+function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) => void }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [rating, setRating] = useState<number | null>(null);
-  const [totalReviews, setTotalReviews] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState<Record<number, boolean>>({});
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const maxReviewLength = 180;
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    update();
+    mediaQuery.addEventListener('change', update);
+
+    return () => mediaQuery.removeEventListener('change', update);
+  }, []);
 
   // Buscar reviews do Google via Edge Function
   useEffect(() => {
@@ -762,34 +805,36 @@ function ReviewsCarousel() {
           console.error('Erro ao buscar reviews:', error);
           // Usar reviews de exemplo em caso de erro
           setReviews(getExampleReviews());
-          setRating(4.8);
-          setTotalReviews(127);
+          onSummary?.({ rating: 4.9, totalReviews: 600 });
         } else if (data?.success) {
           const reviewsData = data.data.reviews || [];
           // Embaralhar reviews
           const shuffled = [...reviewsData].sort(() => Math.random() - 0.5);
           setReviews(shuffled);
-          setRating(data.data.rating);
-          setTotalReviews(data.data.user_ratings_total);
+          onSummary?.({
+            rating: data.data.rating,
+            totalReviews: data.data.user_ratings_total,
+            cached: data.cached,
+            cacheAgeHours: data.cache_age_hours,
+            cachedAt: data.cached_at ?? null,
+          });
         } else {
           // Usar reviews de exemplo
           setReviews(getExampleReviews());
-          setRating(4.8);
-          setTotalReviews(127);
+          onSummary?.({ rating: 4.9, totalReviews: 600 });
         }
       } catch (error) {
         console.error('Erro ao buscar reviews:', error);
         // Usar reviews de exemplo em caso de erro
         setReviews(getExampleReviews());
-        setRating(4.8);
-        setTotalReviews(127);
+        onSummary?.({ rating: 4.9, totalReviews: 600 });
       } finally {
         setLoading(false);
       }
     };
 
     fetchReviews();
-  }, []);
+  }, [onSummary]);
 
   // Reviews de exemplo (fallback)
   const getExampleReviews = () => [
@@ -839,14 +884,14 @@ function ReviewsCarousel() {
 
   // Auto-play do carrossel
   useEffect(() => {
-    if (!isAutoPlaying || reviews.length === 0) return;
+    if (!isAutoPlaying || prefersReducedMotion || reviews.length === 0) return;
 
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % reviews.length);
     }, 6000); // Muda a cada 6 segundos
 
     return () => clearInterval(interval);
-  }, [isAutoPlaying, reviews.length]);
+  }, [isAutoPlaying, prefersReducedMotion, reviews.length]);
 
   const goToNext = () => {
     setIsAutoPlaying(false);
@@ -949,6 +994,7 @@ function ReviewsCarousel() {
 
       {/* Botões de Navegação */}
       <button
+        type="button"
         onClick={goToPrevious}
         className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 xl:-translate-x-12 bg-primary/20 hover:bg-primary/30 text-primary p-3 rounded-full border border-primary/30 hover:border-primary transition-all duration-300 backdrop-blur-sm"
         aria-label="Avaliação anterior"
@@ -956,6 +1002,7 @@ function ReviewsCarousel() {
         <ChevronLeft className="h-6 w-6" />
       </button>
       <button
+        type="button"
         onClick={goToNext}
         className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 xl:translate-x-12 bg-primary/20 hover:bg-primary/30 text-primary p-3 rounded-full border border-primary/30 hover:border-primary transition-all duration-300 backdrop-blur-sm"
         aria-label="Próxima avaliação"
@@ -967,6 +1014,7 @@ function ReviewsCarousel() {
       <div className="flex justify-center gap-2 mt-6">
         {reviews.map((_, index) => (
           <button
+            type="button"
             key={index}
             onClick={() => goToSlide(index)}
             className={`h-2 rounded-full transition-all duration-300 ${
