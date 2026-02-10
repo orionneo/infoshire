@@ -263,7 +263,7 @@ export default function Home() {
             </p>
           </div>
 
-          <ProcessFlowArrows steps={processSteps} />
+          <ProcessCarousel steps={processSteps} />
         </div>
       </section>
       {/* Features Section */}
@@ -558,216 +558,148 @@ function HeroProcessMini() {
   );
 }
 
-function ProcessFlowArrows({ steps }: { steps: ProcessStep[] }) {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const touchStartX = useRef<number | null>(null);
-  const touchDeltaX = useRef(0);
+function ProcessCarousel({ steps }: { steps: ProcessStep[] }) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
+  const pageWidthRatio = 0.92;
+
+  const updateState = () => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const maxScrollLeft = Math.max(track.scrollWidth - track.clientWidth, 0);
+    setCanPrev(track.scrollLeft > 8);
+    setCanNext(track.scrollLeft < maxScrollLeft - 8);
+
+    const nextIndex = Math.round(track.scrollLeft / (track.clientWidth * pageWidthRatio));
+    setCurrentIndex(Math.max(0, nextIndex));
+  };
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
-    handleChange();
-
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
-
-    mediaQuery.addListener(handleChange);
-    return () => mediaQuery.removeListener(handleChange);
+    updateState();
+    const onResize = () => updateState();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  const handleScroll = () => {
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current);
+    }
+
+    frameRef.current = requestAnimationFrame(() => {
+      updateState();
+    });
+  };
+
   useEffect(() => {
-    if (prefersReducedMotion || !isAutoPlaying) {
-      return undefined;
-    }
+    return () => {
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, []);
 
-    const intervalId = window.setInterval(() => {
-      setCurrentStep((prev) => (prev + 1) % steps.length);
-    }, 3500);
-
-    return () => window.clearInterval(intervalId);
-  }, [isAutoPlaying, prefersReducedMotion, steps.length]);
-
-  const goToStep = (index: number) => {
-    setIsAutoPlaying(false);
-    setCurrentStep((index + steps.length) % steps.length);
+  const handleNext = () => {
+    trackRef.current?.scrollBy({
+      left: trackRef.current.clientWidth * pageWidthRatio,
+      behavior: 'smooth',
+    });
   };
 
-  const handlePrev = () => goToStep(currentStep - 1);
-  const handleNext = () => goToStep(currentStep + 1);
-
-  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
-    touchStartX.current = event.touches[0]?.clientX ?? null;
-    touchDeltaX.current = 0;
+  const handlePrev = () => {
+    trackRef.current?.scrollBy({
+      left: -trackRef.current.clientWidth * pageWidthRatio,
+      behavior: 'smooth',
+    });
   };
 
-  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (touchStartX.current === null) {
-      return;
-    }
-    touchDeltaX.current = event.touches[0].clientX - touchStartX.current;
-  };
-
-  const handleTouchEnd = () => {
-    if (touchStartX.current === null) {
-      return;
-    }
-    if (touchDeltaX.current > 40) {
-      handlePrev();
-    } else if (touchDeltaX.current < -40) {
-      handleNext();
-    }
-    touchStartX.current = null;
-    touchDeltaX.current = 0;
-  };
-
-  const progressValue = ((currentStep + 1) / steps.length) * 100;
+  const totalPages = Math.max(1, Math.ceil(steps.length / 2));
 
   return (
-    <div className="space-y-10">
-      <div className="md:hidden space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={handlePrev}
-            className="h-10 w-10 border-primary/40 text-primary hover:border-primary hover:bg-primary/10"
-            aria-label="Etapa anterior"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            {steps.map((_, index) => (
-              <button
-                key={`step-dot-${index}`}
-                type="button"
-                onClick={() => goToStep(index)}
-                className={`h-2.5 w-2.5 rounded-full transition-all ${
-                  index === currentStep ? 'bg-primary shadow-[0_0_10px_rgba(139,255,0,0.6)]' : 'bg-primary/30'
-                }`}
-                aria-label={`Ir para etapa ${index + 1}`}
-                aria-current={index === currentStep ? 'step' : undefined}
-              />
-            ))}
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={handleNext}
-            className="h-10 w-10 border-primary/40 text-primary hover:border-primary hover:bg-primary/10"
-            aria-label="Próxima etapa"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-        </div>
+    <div className="relative">
+      <div
+        ref={trackRef}
+        onScroll={handleScroll}
+        className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth px-1 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {steps.map((step, index) => {
+          const Icon = step.icon;
 
-        <div
-          className="space-y-4"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div className="overflow-hidden rounded-2xl border border-primary/20 bg-card/40">
-            <div
-              className="flex transition-transform duration-500 ease-out"
-              style={{ transform: `translateX(-${currentStep * 100}%)` }}
+          return (
+            <Card
+              key={step.title}
+              className="min-w-[86%] md:min-w-[46%] xl:min-w-[32%] snap-start bg-card/55 backdrop-blur border border-primary/30 hover:border-primary/60 transition-all duration-300 shadow-[0_0_20px_rgba(139,255,0,0.08)]"
             >
-              {steps.map((step, index) => {
-                const Icon = step.icon;
-                return (
-                  <div key={step.title} className="w-full flex-shrink-0 p-4">
-                    <Card className="bg-card/60 backdrop-blur border-primary/40 shadow-[0_0_18px_rgba(139,255,0,0.12)]">
-                      <CardContent className="p-4 flex flex-col gap-4">
-                        <div className="flex items-start justify-between">
-                          <div className="h-12 w-12 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
-                            <Icon className="h-6 w-6 text-primary" />
-                          </div>
-                          {step.highlight && (
-                            <span className="text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
-                              Diferencial InfoShire
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {step.description}
-                          </p>
-                        </div>
-                        <div className="text-xs uppercase tracking-wide text-primary">
-                          Etapa {index + 1} de {steps.length}
-                        </div>
-                      </CardContent>
-                    </Card>
+              <CardContent className="p-6 flex flex-col gap-4 h-full">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
+                    <Icon className="h-7 w-7 text-primary" />
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Etapa {currentStep + 1} de {steps.length}</span>
-              {!prefersReducedMotion && !isAutoPlaying && (
-                <span className="text-[10px] uppercase tracking-wide text-primary/70">Autoplay pausado</span>
-              )}
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-primary/10">
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-300"
-                style={{ width: `${progressValue}%` }}
-              />
-            </div>
-          </div>
-        </div>
+                  <div className="h-8 w-8 rounded-full border border-primary/40 bg-primary/10 text-primary text-sm font-bold flex items-center justify-center">
+                    {index + 1}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
+                </div>
+                {step.highlight && (
+                  <span className="text-[10px] mt-auto w-fit uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
+                    Diferencial InfoShire
+                  </span>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      <div className="hidden md:block">
-        <div className="overflow-x-auto pb-2">
-          <div className="flex items-stretch gap-4 snap-x snap-mandatory">
-            {steps.map((step, index) => {
-              const Icon = step.icon;
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-background to-transparent" />
 
-              return (
-                <React.Fragment key={step.title}>
-                  <Card className="min-w-[340px] max-w-[340px] snap-start bg-card/50 backdrop-blur border-border hover:border-primary/60 transition-all duration-300">
-                    <CardContent className="p-6 flex flex-col gap-4">
-                      <div className="flex items-start justify-between">
-                        <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center border border-primary/30">
-                          <Icon className="h-7 w-7 text-primary" />
-                        </div>
-                        <div className="h-8 w-8 rounded-full border border-primary/40 bg-primary/10 text-primary text-sm font-bold flex items-center justify-center">
-                          {index + 1}
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {step.description}
-                        </p>
-                      </div>
-                      {step.highlight && (
-                        <span className="text-[10px] w-fit uppercase tracking-wide bg-primary/20 text-primary px-2 py-1 rounded-full border border-primary/40">
-                          Diferencial InfoShire
-                        </span>
-                      )}
-                    </CardContent>
-                  </Card>
-                  {index < steps.length - 1 && (
-                    <div className="flex items-center justify-center px-1 text-primary/70">
-                      <ChevronRight className="h-6 w-6" />
-                    </div>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </div>
+      {canPrev && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={handlePrev}
+          className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 border-primary/50 bg-background/70 backdrop-blur text-primary hover:border-primary hover:bg-primary/10"
+          aria-label="Ver etapas anteriores"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+      )}
+
+      {canNext && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={handleNext}
+          className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 border-primary/50 bg-background/70 backdrop-blur text-primary hover:border-primary hover:bg-primary/10"
+          aria-label="Ver próximas etapas"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </Button>
+      )}
+
+      <div className="mt-4 flex items-center justify-center gap-2">
+        {Array.from({ length: totalPages }).map((_, index) => {
+          const isActive = index === Math.min(currentIndex, totalPages - 1);
+          return (
+            <span
+              key={`process-dot-${index}`}
+              className={`h-2.5 rounded-full transition-all ${
+                isActive ? 'w-6 bg-primary shadow-[0_0_8px_rgba(139,255,0,0.6)]' : 'w-2.5 bg-primary/30'
+              }`}
+            />
+          );
+        })}
       </div>
     </div>
   );
