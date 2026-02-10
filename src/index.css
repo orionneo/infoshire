@@ -474,30 +474,37 @@ All colors MUST be HSL.
   }
 }
 
+/* Sheen premium (reflexo) */
 @media (prefers-reduced-motion: reduce) {
-  .sheen-premium { display: none; }
+  .sheen-premium { display: none !important; }
 }
 
 .sheen-premium{
   position:absolute;
-  inset:-40%;
-  transform: translateX(-60%) rotate(18deg);
+  inset:-30%;
+  transform: translateX(-70%) rotate(18deg);
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255,255,255,0.08) 35%,
-    rgba(255,255,255,0.18) 50%,
-    rgba(255,255,255,0.08) 65%,
+    rgba(255,255,255,0.06) 35%,
+    rgba(255,255,255,0.16) 50%,
+    rgba(255,255,255,0.06) 65%,
     transparent 100%
   );
-  filter: blur(0.2px);
-  animation: sheenMove 6.5s ease-in-out infinite;
-  opacity: 0.85;
+  filter: blur(0.35px);
+  animation: sheenMove 7.2s ease-in-out infinite;
+  opacity: 0.95;
+  will-change: transform, opacity;
 }
 
 @keyframes sheenMove{
-  0%, 55% { transform: translateX(-60%) rotate(18deg); opacity: 0; }
-  62% { opacity: 0.9; }
-  78% { transform: translateX(60%) rotate(18deg); opacity: 0.75; }
-  100% { transform: translateX(60%) rotate(18deg); opacity: 0; }
+  0%, 58% { transform: translateX(-70%) rotate(18deg); opacity: 0; }
+  64% { opacity: 0.95; }
+  82% { transform: translateX(70%) rotate(18deg); opacity: 0.75; }
+  100% { transform: translateX(70%) rotate(18deg); opacity: 0; }
+}
+
+/* Fallback seguro: se não suportar mask-image, não renderiza overlay (evita quadrado) */
+@supports not ((-webkit-mask-image: url("")) or (mask-image: url(""))) {
+  .logo-mask-overlay { display: none !important; }
 }
