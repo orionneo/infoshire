@@ -12,6 +12,8 @@ import logoInfoshire from '@/assets/images/logo-infoshire.png';
 import serviceNotebooks from '@/assets/images/service-notebooks.jpg';
 import serviceVideogames from '@/assets/images/service-videogames.jpg';
 import serviceElectronics from '@/assets/images/service-electronics.jpg';
+import wizardImage from '@/assets/images/wizard.png';
+
 
 type ProcessStep = {
   title: string;
@@ -27,6 +29,232 @@ type ReviewsSummary = {
   cacheAgeHours?: number;
   cachedAt?: string | null;
 };
+
+function TechWizard({
+  ratingText,
+  totalText,
+  onCtaClick,
+}: {
+  ratingText: string;
+  totalText: string;
+  onCtaClick: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [step, setStep] = React.useState(0);
+  const [reduceMotion, setReduceMotion] = React.useState(false);
+  const [isClosing, setIsClosing] = React.useState(false);
+
+  React.useEffect(() => {
+    // reduced motion
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const update = () => setReduceMotion(!!mq?.matches);
+    update();
+    mq?.addEventListener?.('change', update);
+
+    // localStorage gating (24h)
+    let dismissedUntil = 0;
+    try {
+      dismissedUntil = Number(localStorage.getItem('infoshire_wizard_dismissed_until') || '0');
+    } catch {}
+
+    if (Date.now() < dismissedUntil) return;
+
+    const t = window.setTimeout(() => {
+      setIsClosing(false);
+      setStep(0);
+      setOpen(true);
+    }, 1200);
+    return () => {
+      window.clearTimeout(t);
+      mq?.removeEventListener?.('change', update);
+    };
+  }, []);
+
+  const close = () => {
+    setOpen(false);
+    try {
+      localStorage.setItem(
+        'infoshire_wizard_dismissed_until',
+        String(Date.now() + 24 * 60 * 60 * 1000),
+      );
+    } catch {}
+  };
+
+  if (!open) return null;
+
+  const messages = [
+    'Olá! Eu sou o Mago da InfoShire 🧙‍♂️',
+    `A InfoShire é nota 10! ⭐ ${ratingText} com ${totalText} avaliações reais.`,
+    'Perfeito! Te levo pro WhatsApp agora. Até já! ✨',
+  ];
+
+  const handleWizardClick = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    setStep(2);
+
+    // dá um micro-tempo pro usuário ver a mensagem de “até já”
+    window.setTimeout(() => {
+      onCtaClick();
+      close();
+    }, 220);
+  };
+
+  const next = () => setStep((s) => Math.min(2, s + 1));
+
+  return (
+    <div
+      className="fixed z-[80] right-4 md:right-6"
+      style={{
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+      }}
+    >
+      <div className="flex items-end gap-3">
+        {/* Clique no personagem já leva pro WhatsApp */}
+        <button
+          type="button"
+          onClick={handleWizardClick}
+          aria-label="Falar com a InfoShire no WhatsApp"
+          className={[
+            'group relative',
+            'h-16 w-16 md:h-20 md:w-20',
+            'select-none',
+            'rounded-full',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+          ].join(' ')}
+        >
+          {/* glow */}
+          <span
+            className={[
+              'absolute inset-0 rounded-full',
+              'bg-primary/20 blur-xl',
+              reduceMotion ? '' : 'animate-[wizardPulse_2.8s_ease-in-out_infinite]',
+            ].join(' ')}
+          />
+          <img
+            src={wizardImage}
+            alt="Mago da InfoShire"
+            className={[
+              'relative h-full w-full object-contain',
+              reduceMotion ? '' : 'animate-[wizardFloat_4.2s_ease-in-out_infinite]',
+              'drop-shadow-[0_12px_28px_rgba(0,0,0,0.45)]',
+              'transition-transform duration-200',
+              'group-hover:scale-[1.03]',
+              'active:scale-[0.98]',
+            ].join(' ')}
+            draggable={false}
+          />
+        </button>
+
+        {/* Balão clicável (leva pro WhatsApp) */}
+        <button
+          type="button"
+          onClick={handleWizardClick}
+          aria-label="Abrir orçamento no WhatsApp"
+          className={[
+            'text-left',
+            'w-[min(92vw,420px)] md:w-[420px]',
+            'rounded-2xl border border-primary/30 bg-card/75 backdrop-blur-md',
+            'shadow-[0_20px_60px_rgba(0,0,0,0.55)]',
+            'hover:border-primary/50 hover:bg-card/80 transition',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+          ].join(' ')}
+        >
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm md:text-base leading-relaxed text-foreground/95">
+                {messages[step]}
+              </p>
+
+              {/* Fechar: precisa parar propagação pra não abrir WhatsApp */}
+              <button
+                type="button"
+                aria-label="Fechar assistente"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  close();
+                }}
+                className="shrink-0 rounded-md p-2 text-foreground/70 hover:text-foreground hover:bg-white/5 transition"
+              >
+                <span className="text-lg leading-none">×</span>
+              </button>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-2">
+              {/* Dots */}
+              <div className="flex gap-1">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className={[
+                      'h-1.5 w-5 rounded-full transition',
+                      i === step ? 'bg-primary shadow-[0_0_10px_rgba(139,255,0,0.45)]' : 'bg-white/15',
+                    ].join(' ')}
+                  />
+                ))}
+              </div>
+
+              {/* Ações (não disparam WhatsApp automaticamente) */}
+              <div className="flex gap-2">
+                {step < 2 ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      next();
+                    }}
+                    className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm text-foreground hover:bg-primary/15 transition"
+                  >
+                    Próximo
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleWizardClick();
+                    }}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-black hover:opacity-95 transition"
+                  >
+                    Ir pro WhatsApp
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    close();
+                  }}
+                  className="rounded-lg px-3 py-1.5 text-sm text-foreground/80 hover:text-foreground hover:bg-white/5 transition"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Toque no mago ou no balão para abrir o WhatsApp.
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {/* keyframes inline (garante funcionar em PWA sem mexer no CSS global) */}
+      <style>{`
+        @keyframes wizardFloat {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-5px); }
+        }
+        @keyframes wizardPulse {
+          0%, 100% { opacity: 0.35; transform: scale(1); }
+          50% { opacity: 0.55; transform: scale(1.06); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 
 export default function Home() {
   const navigate = useNavigate();
@@ -141,6 +369,20 @@ export default function Home() {
 
   return (
     <PublicLayout>
+      <TechWizard
+        ratingText={formattedRating}
+        totalText={formattedTotalReviews}
+        onCtaClick={() => {
+          const el = document.getElementById('cta-whatsapp') as HTMLButtonElement | null;
+          if (el) {
+            el.click();
+          } else {
+            // fallback: desce para o CTA (se o botão não existir por algum motivo)
+            document.querySelector('[data-cta="whatsapp"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+          }
+        }}
+      />
+
       {/* Popup Promocional */}
       <PromotionalPopup />
       
@@ -226,6 +468,8 @@ export default function Home() {
               <BudgetWhatsAppModal
                 trigger={(
                   <Button
+                    id="cta-whatsapp"
+                    data-cta="whatsapp"
                     size="lg"
                     className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-black font-semibold shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all duration-300"
                   >
