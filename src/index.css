@@ -473,3 +473,31 @@ All colors MUST be HSL.
     display: none;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .sheen-premium { display: none; }
+}
+
+.sheen-premium{
+  position:absolute;
+  inset:-40%;
+  transform: translateX(-60%) rotate(18deg);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.08) 35%,
+    rgba(255,255,255,0.18) 50%,
+    rgba(255,255,255,0.08) 65%,
+    transparent 100%
+  );
+  filter: blur(0.2px);
+  animation: sheenMove 6.5s ease-in-out infinite;
+  opacity: 0.85;
+}
+
+@keyframes sheenMove{
+  0%, 55% { transform: translateX(-60%) rotate(18deg); opacity: 0; }
+  62% { opacity: 0.9; }
+  78% { transform: translateX(60%) rotate(18deg); opacity: 0.75; }
+  100% { transform: translateX(60%) rotate(18deg); opacity: 0; }
+}

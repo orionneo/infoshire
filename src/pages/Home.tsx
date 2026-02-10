@@ -130,11 +130,24 @@ export default function Home() {
             <div className="mb-12 flex justify-center animate-fade-in-up">
               <div className="w-full max-w-lg xl:max-w-3xl relative px-4">
                 <div className="absolute inset-0 bg-primary/20 blur-3xl animate-pulse"></div>
-                <LogoEdgeSparkles
-                  src={logoInfoshire}
-                  alt="InfoShire - Games e Informática"
-                  className="animate-float drop-shadow-[0_0_10px_rgba(255,255,255,0.25)]"
-                />
+                <div className="relative">
+                  <div
+                    className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.06] mix-blend-overlay"
+                    style={{
+                      backgroundImage:
+                        'radial-gradient(circle at 20% 10%, rgba(255,255,255,0.35), transparent 35%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.22), transparent 40%), radial-gradient(circle at 30% 80%, rgba(255,255,255,0.18), transparent 45%)',
+                    }}
+                  />
+                  <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                    <div className="sheen-premium" />
+                  </div>
+
+                  <LogoEdgeSparkles
+                    src={logoInfoshire}
+                    alt="InfoShire - Games e Informática"
+                    className="drop-shadow-[0_0_12px_rgba(255,255,255,0.22)]"
+                  />
+                </div>
               </div>
             </div>
             
