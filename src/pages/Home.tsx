@@ -1,4 +1,20 @@
-import { Activity, ChevronLeft, ChevronRight, ClipboardList, Clock, Gamepad2, Laptop, MessageSquare, Microscope, Monitor, Package, Shield, ShieldCheck, Truck, Wrench } from 'lucide-react';
+import {
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  Gamepad2,
+  Laptop,
+  MessageSquare,
+  Microscope,
+  Monitor,
+  Package,
+  Shield,
+  ShieldCheck,
+  Truck,
+  Wrench,
+} from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BudgetWhatsAppModal } from '@/components/BudgetWhatsAppModal';
@@ -13,7 +29,6 @@ import serviceNotebooks from '@/assets/images/service-notebooks.jpg';
 import serviceVideogames from '@/assets/images/service-videogames.jpg';
 import serviceElectronics from '@/assets/images/service-electronics.jpg';
 import wizardImage from '@/assets/images/wizard.png';
-
 
 type ProcessStep = {
   title: string;
@@ -30,6 +45,10 @@ type ReviewsSummary = {
   cachedAt?: string | null;
 };
 
+/**
+ * Wizard: clique no mago OU no balão abre o MESMO fluxo do botão "Pedir Orçamento"
+ * (a gente dispara click no botão do CTA do Hero via id).
+ */
 function TechWizard({
   ratingText,
   totalText,
@@ -42,7 +61,6 @@ function TechWizard({
   const [open, setOpen] = React.useState(false);
   const [step, setStep] = React.useState(0);
   const [reduceMotion, setReduceMotion] = React.useState(false);
-  const [isClosing, setIsClosing] = React.useState(false);
 
   React.useEffect(() => {
     // reduced motion
@@ -59,11 +77,7 @@ function TechWizard({
 
     if (Date.now() < dismissedUntil) return;
 
-    const t = window.setTimeout(() => {
-      setIsClosing(false);
-      setStep(0);
-      setOpen(true);
-    }, 1200);
+    const t = window.setTimeout(() => setOpen(true), 1200);
     return () => {
       window.clearTimeout(t);
       mq?.removeEventListener?.('change', update);
@@ -85,19 +99,12 @@ function TechWizard({
   const messages = [
     'Olá! Eu sou o Mago da InfoShire 🧙‍♂️',
     `A InfoShire é nota 10! ⭐ ${ratingText} com ${totalText} avaliações reais.`,
-    'Perfeito! Te levo pro WhatsApp agora. Até já! ✨',
+    'Quer agilizar seu orçamento? Toca aqui e eu te levo pro WhatsApp 👇',
   ];
 
   const handleWizardClick = () => {
-    if (isClosing) return;
-    setIsClosing(true);
+    onCtaClick();
     setStep(2);
-
-    // dá um micro-tempo pro usuário ver a mensagem de “até já”
-    window.setTimeout(() => {
-      onCtaClick();
-      close();
-    }, 220);
   };
 
   const next = () => setStep((s) => Math.min(2, s + 1));
@@ -105,9 +112,7 @@ function TechWizard({
   return (
     <div
       className="fixed z-[80] right-4 md:right-6"
-      style={{
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
-      }}
+      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
     >
       <div className="flex items-end gap-3">
         {/* Clique no personagem já leva pro WhatsApp */}
@@ -188,7 +193,9 @@ function TechWizard({
                     key={i}
                     className={[
                       'h-1.5 w-5 rounded-full transition',
-                      i === step ? 'bg-primary shadow-[0_0_10px_rgba(139,255,0,0.45)]' : 'bg-white/15',
+                      i === step
+                        ? 'bg-primary shadow-[0_0_10px_rgba(139,255,0,0.45)]'
+                        : 'bg-white/15',
                     ].join(' ')}
                   />
                 ))}
@@ -212,7 +219,7 @@ function TechWizard({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleWizardClick();
+                      onCtaClick();
                     }}
                     className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-black hover:opacity-95 transition"
                   >
@@ -240,7 +247,7 @@ function TechWizard({
         </button>
       </div>
 
-      {/* keyframes inline (garante funcionar em PWA sem mexer no CSS global) */}
+      {/* keyframes inline (PWA safe) */}
       <style>{`
         @keyframes wizardFloat {
           0%, 100% { transform: translateY(0px); }
@@ -255,7 +262,6 @@ function TechWizard({
   );
 }
 
-
 export default function Home() {
   const navigate = useNavigate();
   const [googleSummary, setGoogleSummary] = useState<ReviewsSummary>({
@@ -266,9 +272,7 @@ export default function Home() {
     cachedAt: null,
   });
 
-  const formattedRating = Number.isFinite(googleSummary.rating)
-    ? googleSummary.rating.toFixed(1)
-    : '4.9';
+  const formattedRating = Number.isFinite(googleSummary.rating) ? googleSummary.rating.toFixed(1) : '4.9';
   const formattedTotalReviews = `${new Intl.NumberFormat('pt-BR').format(
     Number.isFinite(googleSummary.totalReviews) ? googleSummary.totalReviews : 600,
   )}+`;
@@ -311,13 +315,15 @@ export default function Home() {
   const simpleServices = [
     {
       title: 'Notebooks, PCs e Macs',
-      description: 'Diagnóstico completo, reparo avançado de periféricos, upgrades, modding e recuperação de dados',
+      description:
+        'Diagnóstico completo, reparo avançado de periféricos, upgrades, modding e recuperação de dados',
       icon: Laptop,
       image: serviceNotebooks,
     },
     {
       title: 'Videogames',
-      description: 'Reparo especializado para todas as plataformas: PlayStation, Xbox, Nintendo e consoles retro',
+      description:
+        'Reparo especializado para todas as plataformas: PlayStation, Xbox, Nintendo e consoles retro',
       icon: Gamepad2,
       image: serviceVideogames,
     },
@@ -369,23 +375,9 @@ export default function Home() {
 
   return (
     <PublicLayout>
-      <TechWizard
-        ratingText={formattedRating}
-        totalText={formattedTotalReviews}
-        onCtaClick={() => {
-          const el = document.getElementById('cta-whatsapp') as HTMLButtonElement | null;
-          if (el) {
-            el.click();
-          } else {
-            // fallback: desce para o CTA (se o botão não existir por algum motivo)
-            document.querySelector('[data-cta="whatsapp"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-          }
-        }}
-      />
-
       {/* Popup Promocional */}
       <PromotionalPopup />
-      
+
       {/* Hero Section */}
       <section className="relative bg-transparent pb-20 pt-28 sm:pt-32 xl:pb-32 xl:pt-36 overflow-hidden">
         <div className="container relative z-10">
@@ -431,21 +423,43 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            
-            <h1 className="text-3xl xl:text-5xl font-bold mb-6 neon-glow animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+
+            <h1
+              className="text-3xl xl:text-5xl font-bold mb-6 neon-glow animate-fade-in-up"
+              style={{ animationDelay: '0.2s' }}
+            >
               Assistência Técnica Eletrônica Especializada
             </h1>
-            <p className="text-xl xl:text-2xl text-gray-300 mb-8 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
-              Reparo de eletrônicos, computadores, notebooks e videogames com transparência, tecnologia e mais de 24 anos de experiência
+            <p
+              className="text-xl xl:text-2xl text-gray-300 mb-8 animate-fade-in-up"
+              style={{ animationDelay: '0.4s' }}
+            >
+              Reparo de eletrônicos, computadores, notebooks e videogames com transparência, tecnologia e mais de 24 anos
+              de experiência
             </p>
-            
+
             {/* Google Rating Badge - Destacado com animação */}
-            <div className="inline-flex items-center gap-3 mb-8 bg-card/80 backdrop-blur-sm px-8 py-4 rounded-full border border-primary/30 animate-pulse-glow animate-slide-in-left" style={{ animationDelay: '0.6s' }}>
+            <div
+              className="inline-flex items-center gap-3 mb-8 bg-card/80 backdrop-blur-sm px-8 py-4 rounded-full border border-primary/30 animate-pulse-glow animate-slide-in-left"
+              style={{ animationDelay: '0.6s' }}
+            >
               <svg className="h-8 w-8" viewBox="0 0 48 48" fill="none">
-                <path d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" fill="#FFC107"/>
-                <path d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" fill="#FF3D00"/>
-                <path d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" fill="#4CAF50"/>
-                <path d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" fill="#1976D2"/>
+                <path
+                  d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+                  fill="#FFC107"
+                />
+                <path
+                  d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+                  fill="#FF3D00"
+                />
+                <path
+                  d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+                  fill="#4CAF50"
+                />
+                <path
+                  d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+                  fill="#1976D2"
+                />
               </svg>
               <div className="text-left">
                 <div className="flex items-center gap-2">
@@ -463,19 +477,18 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex flex-col xl:flex-row gap-4 justify-center animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
               <BudgetWhatsAppModal
-                trigger={(
+                trigger={
                   <Button
-                    id="cta-whatsapp"
-                    data-cta="whatsapp"
+                    id="cta-budget-button"
                     size="lg"
                     className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-black font-semibold shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all duration-300"
                   >
                     Pedir Orçamento
                   </Button>
-                )}
+                }
               />
               <Button
                 size="lg"
@@ -493,10 +506,12 @@ export default function Home() {
                 Nossos Serviços
               </Button>
             </div>
+
             <HeroProcessMini />
           </div>
         </div>
       </section>
+
       {/* Como Funciona Section */}
       <section className="hidden md:block py-10 md:py-16 bg-gradient-to-b from-transparent to-card/40 relative">
         <div className="container relative z-10">
@@ -510,6 +525,7 @@ export default function Home() {
           <ProcessCarousel steps={processSteps} />
         </div>
       </section>
+
       {/* Features Section */}
       <section className="py-20 bg-gradient-to-b from-transparent to-card/50 relative">
         <div className="container relative z-10">
@@ -523,8 +539,8 @@ export default function Home() {
             {features.map((feature, index) => {
               const Icon = feature.icon;
               return (
-                <Card 
-                  key={feature.title} 
+                <Card
+                  key={feature.title}
                   className="bg-card/50 backdrop-blur border-border hover:border-primary transition-all duration-300 hover-lift"
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
@@ -543,23 +559,21 @@ export default function Home() {
           </div>
         </div>
       </section>
-      
+
       {/* Services Section - Simple and Clean */}
       <section className="py-20 bg-transparent relative">
         <div className="container relative z-10">
           <div className="text-center mb-12">
             <h2 className="text-3xl xl:text-4xl font-bold mb-4">Nossos Serviços</h2>
-            <p className="text-lg text-muted-foreground">
-              Soluções completas para seus equipamentos eletrônicos
-            </p>
+            <p className="text-lg text-muted-foreground">Soluções completas para seus equipamentos eletrônicos</p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {simpleServices.map((service, index) => {
               const Icon = service.icon;
               return (
-                <Card 
-                  key={service.title} 
+                <Card
+                  key={service.title}
                   className="group relative overflow-hidden bg-card/50 backdrop-blur border-border hover:border-primary transition-all duration-300 cursor-pointer hover-lift"
                   onClick={() => navigate('/services')}
                   style={{ animationDelay: `${index * 0.15}s` }}
@@ -575,13 +589,13 @@ export default function Home() {
                       style={{ filter: 'saturate(1.15) contrast(1.08)' }}
                     />
                   </div>
-                  
+
                   {/* Gradient Overlay - mais leve para ver a imagem */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/55 to-black/25"></div>
-                  
+
                   {/* Neon edge no hover */}
                   <div className="absolute inset-0 border-2 border-transparent group-hover:border-primary/60 group-hover:shadow-lg group-hover:shadow-primary/30 transition-all duration-300 rounded-lg"></div>
-                  
+
                   {/* Content */}
                   <CardContent className="relative z-10 p-8 flex flex-col items-center text-center min-h-[320px] justify-end">
                     {/* Icon */}
@@ -593,16 +607,14 @@ export default function Home() {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Title */}
                     <h3 className="text-2xl font-bold mb-3 text-foreground group-hover:text-primary transition-colors duration-300">
                       {service.title}
                     </h3>
-                    
+
                     {/* Description */}
-                    <p className="text-muted-foreground leading-relaxed">
-                      {service.description}
-                    </p>
+                    <p className="text-muted-foreground leading-relaxed">{service.description}</p>
                   </CardContent>
                 </Card>
               );
@@ -619,10 +631,22 @@ export default function Home() {
             <div className="text-center mb-12">
               <div className="inline-flex items-center gap-3 mb-6 bg-card/50 backdrop-blur-sm px-8 py-4 rounded-full border border-primary/30">
                 <svg className="h-8 w-8" viewBox="0 0 48 48" fill="none">
-                  <path d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" fill="#FFC107"/>
-                  <path d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" fill="#FF3D00"/>
-                  <path d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" fill="#4CAF50"/>
-                  <path d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" fill="#1976D2"/>
+                  <path
+                    d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+                    fill="#FFC107"
+                  />
+                  <path
+                    d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+                    fill="#FF3D00"
+                  />
+                  <path
+                    d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+                    fill="#4CAF50"
+                  />
+                  <path
+                    d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+                    fill="#1976D2"
+                  />
                 </svg>
                 <div className="text-left">
                   <div className="flex items-center gap-2">
@@ -635,7 +659,9 @@ export default function Home() {
                       ))}
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">Baseado em <span className="font-bold text-primary">{formattedTotalReviews}</span> avaliações</p>
+                  <p className="text-sm text-muted-foreground">
+                    Baseado em <span className="font-bold text-primary">{formattedTotalReviews}</span> avaliações
+                  </p>
                 </div>
               </div>
               <h2 className="text-3xl xl:text-5xl font-bold mb-4">
@@ -650,9 +676,7 @@ export default function Home() {
             <ReviewsCarousel onSummary={setGoogleSummary} />
 
             <p className="text-center text-xs text-muted-foreground mt-4">
-              {googleSummary.cached
-                ? `Atualizado há ~${googleSummary.cacheAgeHours?.toFixed(2) ?? 0}h (cache)`
-                : 'Atualizado agora'}
+              {googleSummary.cached ? `Atualizado há ~${googleSummary.cacheAgeHours?.toFixed(2) ?? 0}h (cache)` : 'Atualizado agora'}
             </p>
 
             {/* Google Maps Verified Reviews Integration */}
@@ -661,9 +685,7 @@ export default function Home() {
                 <h3 className="text-2xl xl:text-3xl font-bold mb-3">
                   Avaliações <span className="text-primary">Reais e Verificáveis</span> diretamente do Google
                 </h3>
-                <p className="text-muted-foreground">
-                  Confira nossa reputação oficial na plataforma Google Maps
-                </p>
+                <p className="text-muted-foreground">Confira nossa reputação oficial na plataforma Google Maps</p>
               </div>
 
               {/* Action Buttons */}
@@ -675,13 +697,26 @@ export default function Home() {
                   className="inline-flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary px-6 py-3 rounded-lg border border-primary/30 hover:border-primary transition-all duration-300 font-semibold"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 48 48" fill="none">
-                    <path d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" fill="#FFC107"/>
-                    <path d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" fill="#FF3D00"/>
-                    <path d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" fill="#4CAF50"/>
-                    <path d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" fill="#1976D2"/>
+                    <path
+                      d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+                      fill="#FFC107"
+                    />
+                    <path
+                      d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+                      fill="#FF3D00"
+                    />
+                    <path
+                      d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+                      fill="#4CAF50"
+                    />
+                    <path
+                      d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+                      fill="#1976D2"
+                    />
                   </svg>
                   Ver todas as avaliações no Google
                 </a>
+
                 <a
                   href="https://maps.app.goo.gl/P4UHPrFb6vcmSyoA6"
                   target="_blank"
@@ -705,15 +740,13 @@ export default function Home() {
           <Card className="bg-card/50 border-primary/30 backdrop-blur-sm hover-lift">
             <CardContent className="py-12">
               <div className="max-w-3xl mx-auto text-center">
-                <h2 className="text-3xl xl:text-4xl font-bold mb-6 text-primary">
-                  Sistema de Acompanhamento Diferenciado
-                </h2>
+                <h2 className="text-3xl xl:text-4xl font-bold mb-6 text-primary">Sistema de Acompanhamento Diferenciado</h2>
                 <p className="text-lg mb-8 text-foreground leading-relaxed">
-                  Nosso sistema de acompanhamento de orçamentos e serviços é diferenciado, usamos um sistema moderno que conecta nossos clientes com nossos técnicos, em tempo real, elevando sua experiência de suporte e assistência técnica. Menos ligações, mais transparência e mais confiança.
+                  Nosso sistema de acompanhamento de orçamentos e serviços é diferenciado, usamos um sistema moderno que conecta nossos
+                  clientes com nossos técnicos, em tempo real, elevando sua experiência de suporte e assistência técnica. Menos ligações,
+                  mais transparência e mais confiança.
                 </p>
-                <p className="text-xl font-semibold mb-8 text-primary">
-                  Crie sua conta e acompanhe!
-                </p>
+                <p className="text-xl font-semibold mb-8 text-primary">Crie sua conta e acompanhe!</p>
                 <Button
                   size="lg"
                   variant="outline"
@@ -727,32 +760,26 @@ export default function Home() {
           </Card>
         </div>
       </section>
+
+      {/* WIZARD FIXED (abre o mesmo fluxo do CTA "Pedir Orçamento") */}
+      <TechWizard
+        ratingText={formattedRating}
+        totalText={formattedTotalReviews}
+        onCtaClick={() => {
+          const btn = document.getElementById('cta-budget-button') as HTMLButtonElement | null;
+          btn?.click();
+        }}
+      />
     </PublicLayout>
   );
 }
 
 function HeroProcessMini() {
   const steps = [
-    {
-      title: 'Contato no WhatsApp',
-      description: 'Explique o problema e envie fotos.',
-      icon: MessageSquare,
-    },
-    {
-      title: 'Diagnóstico Técnico',
-      description: 'Avaliação completa do defeito.',
-      icon: Microscope,
-    },
-    {
-      title: 'Orçamento Transparente',
-      description: 'Você aprova online pelo sistema.',
-      icon: ShieldCheck,
-    },
-    {
-      title: 'Reparo e Entrega',
-      description: 'Reparo realizado e devolução funcionando.',
-      icon: Truck,
-    },
+    { title: 'Contato no WhatsApp', description: 'Explique o problema e envie fotos.', icon: MessageSquare },
+    { title: 'Diagnóstico Técnico', description: 'Avaliação completa do defeito.', icon: Microscope },
+    { title: 'Orçamento Transparente', description: 'Você aprova online pelo sistema.', icon: ShieldCheck },
+    { title: 'Reparo e Entrega', description: 'Reparo realizado e devolução funcionando.', icon: Truck },
   ];
 
   return (
@@ -779,9 +806,7 @@ function HeroProcessMini() {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {step.description}
-                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -795,9 +820,7 @@ function HeroProcessMini() {
           })}
         </div>
       </div>
-      <p className="text-xs text-muted-foreground text-center">
-        Deslize para seguir a sequência →
-      </p>
+      <p className="text-xs text-muted-foreground text-center">Deslize para seguir a sequência →</p>
     </div>
   );
 }
@@ -831,35 +854,26 @@ function ProcessCarousel({ steps }: { steps: ProcessStep[] }) {
   }, []);
 
   const handleScroll = () => {
-    if (frameRef.current) {
-      cancelAnimationFrame(frameRef.current);
-    }
-
-    frameRef.current = requestAnimationFrame(() => {
-      updateState();
-    });
+    if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    frameRef.current = requestAnimationFrame(() => updateState());
   };
 
   useEffect(() => {
     return () => {
-      if (frameRef.current) {
-        cancelAnimationFrame(frameRef.current);
-      }
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
   }, []);
 
   const handleNext = () => {
-    trackRef.current?.scrollBy({
-      left: trackRef.current.clientWidth * pageWidthRatio,
-      behavior: 'smooth',
-    });
+    const t = trackRef.current;
+    if (!t) return;
+    t.scrollBy({ left: t.clientWidth * pageWidthRatio, behavior: 'smooth' });
   };
 
   const handlePrev = () => {
-    trackRef.current?.scrollBy({
-      left: -trackRef.current.clientWidth * pageWidthRatio,
-      behavior: 'smooth',
-    });
+    const t = trackRef.current;
+    if (!t) return;
+    t.scrollBy({ left: -t.clientWidth * pageWidthRatio, behavior: 'smooth' });
   };
 
   const totalPages = Math.max(1, Math.ceil(steps.length / 2));
@@ -873,7 +887,6 @@ function ProcessCarousel({ steps }: { steps: ProcessStep[] }) {
       >
         {steps.map((step, index) => {
           const Icon = step.icon;
-
           return (
             <Card
               key={step.title}
@@ -949,8 +962,6 @@ function ProcessCarousel({ steps }: { steps: ProcessStep[] }) {
   );
 }
 
-// Componente de Integração do Google Maps Reviews
-
 // Componente de Carrossel de Avaliações
 function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) => void }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -971,48 +982,6 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
     return () => mediaQuery.removeEventListener('change', update);
   }, []);
 
-  // Buscar reviews do Google via Edge Function
-  useEffect(() => {
-    const fetchReviews = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('fetch-google-reviews');
-        
-        if (error) {
-          console.error('Erro ao buscar reviews:', error);
-          // Usar reviews de exemplo em caso de erro
-          setReviews(getExampleReviews());
-          onSummary?.({ rating: 4.9, totalReviews: 600 });
-        } else if (data?.success) {
-          const reviewsData = data.data.reviews || [];
-          // Embaralhar reviews
-          const shuffled = [...reviewsData].sort(() => Math.random() - 0.5);
-          setReviews(shuffled);
-          onSummary?.({
-            rating: data.data.rating,
-            totalReviews: data.data.user_ratings_total,
-            cached: data.cached,
-            cacheAgeHours: data.cache_age_hours,
-            cachedAt: data.cached_at ?? null,
-          });
-        } else {
-          // Usar reviews de exemplo
-          setReviews(getExampleReviews());
-          onSummary?.({ rating: 4.9, totalReviews: 600 });
-        }
-      } catch (error) {
-        console.error('Erro ao buscar reviews:', error);
-        // Usar reviews de exemplo em caso de erro
-        setReviews(getExampleReviews());
-        onSummary?.({ rating: 4.9, totalReviews: 600 });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReviews();
-  }, [onSummary]);
-
-  // Reviews de exemplo (fallback)
   const getExampleReviews = () => [
     {
       author_name: 'Carlos Silva',
@@ -1058,13 +1027,50 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
     },
   ];
 
+  // Buscar reviews do Google via Edge Function
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-google-reviews');
+
+        if (error) {
+          console.error('Erro ao buscar reviews:', error);
+          setReviews(getExampleReviews());
+          onSummary?.({ rating: 4.9, totalReviews: 600 });
+        } else if (data?.success) {
+          const reviewsData = data.data.reviews || [];
+          const shuffled = [...reviewsData].sort(() => Math.random() - 0.5);
+          setReviews(shuffled);
+          onSummary?.({
+            rating: data.data.rating,
+            totalReviews: data.data.user_ratings_total,
+            cached: data.cached,
+            cacheAgeHours: data.cache_age_hours,
+            cachedAt: data.cached_at ?? null,
+          });
+        } else {
+          setReviews(getExampleReviews());
+          onSummary?.({ rating: 4.9, totalReviews: 600 });
+        }
+      } catch (error) {
+        console.error('Erro ao buscar reviews:', error);
+        setReviews(getExampleReviews());
+        onSummary?.({ rating: 4.9, totalReviews: 600 });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, [onSummary]);
+
   // Auto-play do carrossel
   useEffect(() => {
     if (!isAutoPlaying || prefersReducedMotion || reviews.length === 0) return;
 
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % reviews.length);
-    }, 6000); // Muda a cada 6 segundos
+    }, 6000);
 
     return () => clearInterval(interval);
   }, [isAutoPlaying, prefersReducedMotion, reviews.length]);
@@ -1085,10 +1091,7 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
   };
 
   const toggleReview = (index: number) => {
-    setExpandedReviews((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
+    setExpandedReviews((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
   if (loading) {
@@ -1099,18 +1102,12 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
     );
   }
 
-  if (reviews.length === 0) {
-    return null;
-  }
+  if (reviews.length === 0) return null;
 
   return (
     <div className="relative mb-8">
-      {/* Carrossel Container */}
       <div className="relative overflow-hidden">
-        <div
-          className="flex transition-transform duration-500 ease-out"
-          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-        >
+        <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${currentIndex * 100}%)` }}>
           {reviews.map((review, index) => {
             const reviewText = review.text ?? '';
             const isLong = reviewText.length > maxReviewLength;
@@ -1137,6 +1134,7 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
                         <p className="text-xs text-muted-foreground">{review.relative_time_description || 'Recente'}</p>
                       </div>
                     </div>
+
                     <div className="flex mb-4">
                       {[...Array(review.rating)].map((_, i) => (
                         <svg key={i} className="h-5 w-5 text-yellow-400 fill-current" viewBox="0 0 20 20">
@@ -1144,11 +1142,10 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
                         </svg>
                       ))}
                     </div>
+
                     <div className="space-y-3">
                       <p className="text-base text-muted-foreground leading-relaxed">
-                        {isLong && !isExpanded
-                          ? `${reviewText.slice(0, maxReviewLength).trim()}...`
-                          : reviewText}
+                        {isLong && !isExpanded ? `${reviewText.slice(0, maxReviewLength).trim()}...` : reviewText}
                       </p>
                       {isLong && (
                         <button
@@ -1168,7 +1165,6 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
         </div>
       </div>
 
-      {/* Botões de Navegação */}
       <button
         type="button"
         onClick={goToPrevious}
@@ -1177,6 +1173,7 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
       >
         <ChevronLeft className="h-6 w-6" />
       </button>
+
       <button
         type="button"
         onClick={goToNext}
@@ -1186,7 +1183,6 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
         <ChevronRight className="h-6 w-6" />
       </button>
 
-      {/* Indicadores de Slide */}
       <div className="flex justify-center gap-2 mt-6">
         {reviews.map((_, index) => (
           <button
@@ -1194,9 +1190,7 @@ function ReviewsCarousel({ onSummary }: { onSummary?: (summary: ReviewsSummary) 
             key={index}
             onClick={() => goToSlide(index)}
             className={`h-2 rounded-full transition-all duration-300 ${
-              index === currentIndex
-                ? 'w-8 bg-primary'
-                : 'w-2 bg-primary/30 hover:bg-primary/50'
+              index === currentIndex ? 'w-8 bg-primary' : 'w-2 bg-primary/30 hover:bg-primary/50'
             }`}
             aria-label={`Ir para avaliação ${index + 1}`}
           />
