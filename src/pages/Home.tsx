@@ -43,6 +43,7 @@ function TechWizard({
   const [step, setStep] = React.useState(0);
   const [reduceMotion, setReduceMotion] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
+  const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
     // reduced motion
@@ -68,6 +69,14 @@ function TechWizard({
       window.clearTimeout(t);
       mq?.removeEventListener?.('change', update);
     };
+  }, []);
+
+  React.useEffect(() => {
+    const mq = window.matchMedia?.('(max-width: 767px)');
+    const update = () => setIsMobile(!!mq?.matches);
+    update();
+    mq?.addEventListener?.('change', update);
+    return () => mq?.removeEventListener?.('change', update);
   }, []);
 
   const close = () => {
@@ -104,12 +113,31 @@ function TechWizard({
 
   return (
     <div
-      className="fixed z-[80] right-4 md:right-6"
+      className="fixed z-[80] left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6"
       style={{
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)',
       }}
     >
-      <div className="flex items-end gap-3">
+      <div className="flex max-w-[95vw] flex-col items-center gap-2 md:max-w-none md:items-end">
+        <div
+          aria-hidden="true"
+          className={[
+            'pointer-events-none select-none text-center font-black uppercase tracking-wide text-transparent',
+            'bg-gradient-to-r from-fuchsia-400 via-yellow-300 to-cyan-300 bg-clip-text',
+            'drop-shadow-[0_6px_0_rgba(0,0,0,0.75)]',
+            'skew-x-[-7deg] rotate-[-2deg]',
+            isMobile ? 'text-[clamp(1.2rem,6vw,1.95rem)] leading-[0.95]' : 'text-[1.85rem] leading-[0.95]',
+          ].join(' ')}
+          style={{
+            textShadow:
+              '-1px -1px 0 #1a103a, 1px -1px 0 #1a103a, -1px 1px 0 #1a103a, 1px 1px 0 #1a103a, 0 4px 0 #0f0a22, 0 7px 12px rgba(0,0,0,0.55)',
+          }}
+        >
+          <span className="block">Fale com o Mago</span>
+          <span className="block text-[0.82em]">Orçamento no WhatsApp</span>
+        </div>
+
+        <div className="flex flex-col-reverse items-center gap-2 md:flex-row md:items-end md:gap-3">
         {/* Clique no personagem já leva pro WhatsApp */}
         <button
           type="button"
@@ -117,7 +145,7 @@ function TechWizard({
           aria-label="Falar com a InfoShire no WhatsApp"
           className={[
             'group relative',
-            'h-16 w-16 md:h-20 md:w-20',
+            'h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32',
             'select-none',
             'rounded-full',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
@@ -127,7 +155,7 @@ function TechWizard({
           <span
             className={[
               'absolute inset-0 rounded-full',
-              'bg-primary/20 blur-xl',
+              'bg-primary/25 blur-2xl',
               reduceMotion ? '' : 'animate-[wizardPulse_2.8s_ease-in-out_infinite]',
             ].join(' ')}
           />
@@ -136,10 +164,8 @@ function TechWizard({
             alt="Mago da InfoShire"
             className={[
               'relative h-full w-full object-contain',
-              reduceMotion ? '' : 'animate-[wizardFloat_4.2s_ease-in-out_infinite]',
               'drop-shadow-[0_12px_28px_rgba(0,0,0,0.45)]',
-              'transition-transform duration-200',
-              'group-hover:scale-[1.03]',
+              reduceMotion ? '' : 'transition-transform duration-300 md:group-hover:scale-[1.03]',
               'active:scale-[0.98]',
             ].join(' ')}
             draggable={false}
@@ -153,16 +179,17 @@ function TechWizard({
           aria-label="Abrir orçamento no WhatsApp"
           className={[
             'text-left',
-            'w-[min(92vw,420px)] md:w-[420px]',
+            'w-[min(88vw,390px)] md:w-[420px]',
+            'max-h-[min(44vh,340px)] md:max-h-none overflow-auto',
             'rounded-2xl border border-primary/30 bg-card/75 backdrop-blur-md',
             'shadow-[0_20px_60px_rgba(0,0,0,0.55)]',
             'hover:border-primary/50 hover:bg-card/80 transition',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
           ].join(' ')}
         >
-          <div className="p-4">
+          <div className="p-3.5 md:p-4">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-sm md:text-base leading-relaxed text-foreground/95">
+              <p className="text-xs sm:text-sm md:text-base leading-relaxed text-foreground/95">
                 {messages[step]}
               </p>
 
@@ -180,7 +207,7 @@ function TechWizard({
               </button>
             </div>
 
-            <div className="mt-3 flex items-center justify-between gap-2">
+            <div className="mt-2.5 flex items-center justify-between gap-2">
               {/* Dots */}
               <div className="flex gap-1">
                 {[0, 1, 2].map((i) => (
@@ -203,7 +230,7 @@ function TechWizard({
                       e.stopPropagation();
                       next();
                     }}
-                    className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm text-foreground hover:bg-primary/15 transition"
+                    className="rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs sm:text-sm text-foreground hover:bg-primary/15 transition"
                   >
                     Próximo
                   </button>
@@ -214,7 +241,7 @@ function TechWizard({
                       e.stopPropagation();
                       handleWizardClick();
                     }}
-                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-black hover:opacity-95 transition"
+                    className="rounded-lg bg-primary px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-black hover:opacity-95 transition"
                   >
                     Ir pro WhatsApp
                   </button>
@@ -226,26 +253,23 @@ function TechWizard({
                     e.stopPropagation();
                     close();
                   }}
-                  className="rounded-lg px-3 py-1.5 text-sm text-foreground/80 hover:text-foreground hover:bg-white/5 transition"
+                  className="rounded-lg px-2.5 py-1.5 text-xs sm:text-sm text-foreground/80 hover:text-foreground hover:bg-white/5 transition"
                 >
                   Fechar
                 </button>
               </div>
             </div>
 
-            <p className="mt-2 text-[11px] text-muted-foreground">
+            <p className="mt-2 text-[10px] sm:text-[11px] text-muted-foreground">
               Toque no mago ou no balão para abrir o WhatsApp.
             </p>
           </div>
         </button>
       </div>
+      </div>
 
       {/* keyframes inline (garante funcionar em PWA sem mexer no CSS global) */}
       <style>{`
-        @keyframes wizardFloat {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-5px); }
-        }
         @keyframes wizardPulse {
           0%, 100% { opacity: 0.35; transform: scale(1); }
           50% { opacity: 0.55; transform: scale(1.06); }
