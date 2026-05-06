@@ -1,5 +1,6 @@
 import { Award, Target, Users, Wrench } from 'lucide-react';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
+import PageMeta from '@/components/common/PageMeta';
 import { Card, CardContent } from '@/components/ui/card';
 import logoInfoshire from '@/assets/images/logo-infoshire.png';
 import aboutTeam1 from '@/assets/images/about-team-1.png';
@@ -33,6 +34,7 @@ export default function About() {
 
   return (
     <PublicLayout>
+      <PageMeta title="Sobre a InfoShire | +24 anos em assistência técnica" description="Conheça a história da InfoShire, laboratório técnico e equipe especializada em reparos eletrônicos de alta complexidade em Campinas." />
       {/* Hero Section - Clean layout like Home */}
       <section
         className="relative bg-transparent pt-28 pb-20 xl:pt-32 xl:pb-32 overflow-hidden"

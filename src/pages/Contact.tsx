@@ -2,6 +2,7 @@ import { Mail, MapPin, MessageCircle, Phone } from 'lucide-react';
 import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
+import PageMeta from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -46,6 +47,7 @@ export default function Contact() {
 
   return (
     <PublicLayout>
+      <PageMeta title="Contato InfoShire | Solicite seu orçamento no WhatsApp" description="Fale com a InfoShire em Campinas. Tire dúvidas, envie seu caso e receba atendimento rápido para orçamento de reparo técnico." />
       {/* Hero Section - Clean layout like Home */}
       <section
         className="relative bg-transparent pt-28 pb-20 xl:pt-32 xl:pb-32 overflow-hidden"

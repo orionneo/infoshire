@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { BudgetWhatsAppModal } from '@/components/BudgetWhatsAppModal';
 import { LogoEdgeSparkles } from '@/components/LogoEdgeSparkles';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
+import PageMeta from '@/components/common/PageMeta';
 import { PromotionalPopup } from '@/components/PromotionalPopup';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -393,6 +394,7 @@ export default function Home() {
 
   return (
     <PublicLayout>
+      <PageMeta title="InfoShire | Assistência técnica em Campinas para notebooks, videogames e eletrônicos" description="Conserto rápido e confiável de notebooks, videogames, TVs e eletrônicos em Campinas. Diagnóstico técnico, peças de qualidade e orçamento pelo WhatsApp." />
       <TechWizard
         ratingText={formattedRating}
         totalText={formattedTotalReviews}
