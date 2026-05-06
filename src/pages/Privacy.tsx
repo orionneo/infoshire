@@ -1,4 +1,5 @@
 import { PublicLayout } from '@/components/layouts/PublicLayout';
+import PageMeta from '@/components/common/PageMeta';
 import { Card, CardContent } from '@/components/ui/card';
 import logoInfoshire from '@/assets/images/logo-infoshire.png';
 
@@ -8,6 +9,7 @@ const LAST_UPDATED = '8 de março de 2025';
 export default function Privacy() {
   return (
     <PublicLayout>
+      <PageMeta title="Política de Privacidade | InfoShire" description="Leia a política de privacidade da InfoShire e entenda como tratamos dados pessoais com segurança e transparência." />
       <section
         className="relative bg-transparent pt-28 pb-20 xl:pt-32 xl:pb-32 overflow-hidden"
         style={{ backgroundImage: 'none' }}

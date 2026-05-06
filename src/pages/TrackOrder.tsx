@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { trackOrdersByEmail, trackOrdersByPhone } from '@/db/api';
 import PublicOrderDetails from '@/components/PublicOrderDetails';
 import { Link } from 'react-router-dom';
+import PageMeta from '@/components/common/PageMeta';
 
 type SearchMode = 'email' | 'phone';
 
@@ -109,6 +110,8 @@ export default function TrackOrder() {
   }
 
   return (
+    <>
+      <PageMeta title="Rastrear ordem de serviço | InfoShire" description="Acompanhe o status da sua ordem de serviço InfoShire por e-mail ou telefone de forma rápida e segura." />
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       {/* Botão de voltar ao site - Sempre visível */}
       <div className="mb-6">
@@ -280,6 +283,7 @@ export default function TrackOrder() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }
 

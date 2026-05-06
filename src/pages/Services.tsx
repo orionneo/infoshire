@@ -1,5 +1,6 @@
 import { Apple, ArrowRight, CheckCircle2, Clock, Database, Gamepad2, HardDrive, Laptop, MessageCircle, Monitor, Shield, Sparkles, Star, Tv, Wrench, Zap } from 'lucide-react';
 import { PublicLayout } from '@/components/layouts/PublicLayout';
+import PageMeta from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -264,6 +265,7 @@ export default function Services() {
 
   return (
     <PublicLayout>
+      <PageMeta title="Serviços de assistência técnica | InfoShire Campinas" description="Conheça os serviços da InfoShire: reparo de consoles, notebooks, Apple, TVs, recuperação de dados e manutenção eletrônica avançada." />
       {/* Hero Section */}
       <section
         className="relative bg-transparent pt-28 pb-20 xl:pt-32 xl:pb-32 overflow-hidden"
