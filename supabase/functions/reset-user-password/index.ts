@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireAdmin } from '../_shared/admin-auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const adminAuth = await requireAdmin(req, corsHeaders);
+    if (!adminAuth.ok) return adminAuth.response;
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -27,7 +31,7 @@ Deno.serve(async (req) => {
 
     if (!userId || !newPassword) {
       return new Response(
-        JSON.stringify({ error: 'userId e newPassword são obrigatórios' }),
+        JSON.stringify({ error: 'userId e newPassword sÃ£o obrigatÃ³rios' }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
