@@ -59,18 +59,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
+    const applySession = async (sessionUser: User | null) => {
+      if (!isMounted) return;
+
+      setUser(sessionUser);
+
+      if (!sessionUser) {
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      const profileData = await getProfile(sessionUser.id);
+      if (!isMounted) return;
+
+      setProfile(profileData);
+      setLoading(false);
+    };
+
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!isMounted) return;
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          const profileData = await getProfile(session.user.id);
-          if (!isMounted) return;
-          setProfile(profileData);
-        } else {
-          setProfile(null);
-        }
+        await applySession(session?.user ?? null);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -80,12 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        getProfile(session.user.id).then(setProfile);
-      } else {
-        setProfile(null);
-      }
+      setLoading(true);
+      applySession(session?.user ?? null);
     });
 
     return () => {
@@ -138,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const normalizedPhone = normalizeBrazilPhoneToWaDigits(phoneInput);
 
       if (!normalizedPhone) {
-        return { error: new Error('Informe DDD + número (ex: 19 99798-8952).') };
+        return { error: new Error('Informe DDD + nÃºmero (ex: 19 99798-8952).') };
       }
 
       const { data: authData, error } = await supabase.auth.signUp({

@@ -18,7 +18,6 @@ const PUBLIC_ROUTES = [
   '/services',
   '/about',
   '/contact',
-  '/init-admin',
   '/auth/callback',
 ];
 
@@ -67,12 +66,14 @@ export function RouteGuard({ children }: RouteGuardProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const hasLoggedPkceDebug = useRef(false);
+  const { effectivePath, codePresent, p: pParam, q: qParam } = getPkceCallbackInfo(location.pathname);
+  const isAuthCallback = effectivePath === '/auth/callback' || codePresent;
+  const isPublic = isAuthCallback || matchPublicRoute(effectivePath, PUBLIC_ROUTES);
+  const isAdminRoute = effectivePath.startsWith('/admin');
+  const requiresAdmin = isAdminRoute || effectivePath === '/init-admin';
 
   useEffect(() => {
     if (loading) return;
-    const { effectivePath, codePresent, p: pParam, q: qParam } = getPkceCallbackInfo(location.pathname);
-    const isAuthCallback = effectivePath === '/auth/callback' || codePresent;
-    const isPublic = isAuthCallback || matchPublicRoute(effectivePath, PUBLIC_ROUTES);
 
     let pkceDebug = false;
     try {
@@ -110,7 +111,14 @@ export function RouteGuard({ children }: RouteGuardProps) {
       return;
     }
 
-    const isAdminRoute = effectivePath.startsWith('/admin');
+    if (requiresAdmin && (!profile || profile.role !== 'admin')) {
+      navigate(user ? '/client' : '/login', {
+        state: { from: effectivePath, reason: 'admin_required' },
+        replace: true,
+      });
+      return;
+    }
+
     if (user && profile && !isAdminRoute && profile.role !== 'admin') {
       const isClientRoute = effectivePath.startsWith('/client');
       const isCompleteProfileRoute = effectivePath === '/complete-profile';
@@ -118,9 +126,23 @@ export function RouteGuard({ children }: RouteGuardProps) {
         navigate('/complete-profile', { replace: true });
       }
     }
-  }, [user, profile, loading, location.pathname, location.search, navigate]);
+  }, [user, profile, loading, location.pathname, location.search, navigate, effectivePath, isAdminRoute, requiresAdmin, isPublic, isAuthCallback, codePresent, pParam, qParam]);
+
+  const loadingScreen = (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>
+  );
 
   if (loading) {
+    return loadingScreen;
+  }
+
+  if (!user && !isPublic) {
+    return loadingScreen;
+  }
+
+  if (requiresAdmin && (!profile || profile.role !== 'admin')) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

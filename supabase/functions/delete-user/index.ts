@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireAdmin } from '../_shared/admin-auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,12 +13,15 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const adminAuth = await requireAdmin(req, corsHeaders);
+    if (!adminAuth.ok) return adminAuth.response;
+
     // Get userId from request body
     const { userId } = await req.json();
 
     if (!userId) {
       return new Response(
-        JSON.stringify({ error: 'userId é obrigatório' }),
+        JSON.stringify({ error: 'userId Ã© obrigatÃ³rio' }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -42,7 +46,7 @@ Deno.serve(async (req) => {
     
     if (getUserError || !userData.user) {
       return new Response(
-        JSON.stringify({ error: 'Usuário não encontrado' }),
+        JSON.stringify({ error: 'UsuÃ¡rio nÃ£o encontrado' }),
         {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -56,7 +60,7 @@ Deno.serve(async (req) => {
     if (deleteError) {
       console.error('Error deleting user:', deleteError);
       return new Response(
-        JSON.stringify({ error: `Erro ao deletar usuário: ${deleteError.message}` }),
+        JSON.stringify({ error: `Erro ao deletar usuÃ¡rio: ${deleteError.message}` }),
         {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -67,7 +71,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Usuário deletado com sucesso'
+        message: 'UsuÃ¡rio deletado com sucesso'
       }),
       {
         status: 200,
